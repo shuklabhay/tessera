@@ -1,0 +1,5 @@
+google-genai
+sounddevice
+numpy
+python-dotenv
+certifi 
