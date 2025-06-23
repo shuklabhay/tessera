@@ -27,19 +27,16 @@ client = genai.Client(
     api_key=os.environ.get("GEMINI_API_KEY"),
 )
 
-CONFIG = types.LiveConnectConfig(
-    response_modalities=["AUDIO"],
-    media_resolution="MEDIA_RESOLUTION_MEDIUM",
-    speech_config=types.SpeechConfig(
-        voice_config=types.VoiceConfig(
-            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Zephyr")
-        )
-    ),
-    context_window_compression=types.ContextWindowCompressionConfig(
-        trigger_tokens=25600,
-        sliding_window=types.SlidingWindow(target_tokens=12800),
-    ),
-)
+
+def load_system_prompt():
+    prompt_path = os.path.join(
+        os.path.dirname(__file__), "..", "prompts", "system_prompt.md"
+    )
+    try:
+        with open(prompt_path, "r") as file:
+            return file.read()
+    except Exception:
+        return None
 
 
 class VoiceChat:
@@ -52,12 +49,48 @@ class VoiceChat:
         self.running = False
         self.gemini_speaking = False
         self.last_gemini_audio = 0
-        self.speech_threshold = 400
+        self.speech_threshold = 500
         self.recording = False
         self.last_voice_detected = 0
-        self.recording_duration = 2.5
-        self.system_prompt = None
+        self.recording_duration = 1.5
+        self.system_prompt = load_system_prompt()
         self.current_audio_amplitude = 0
+
+    def get_config(self):
+        if self.system_prompt:
+            return types.LiveConnectConfig(
+                response_modalities=["AUDIO"],
+                media_resolution="MEDIA_RESOLUTION_MEDIUM",
+                speech_config=types.SpeechConfig(
+                    voice_config=types.VoiceConfig(
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                            voice_name="Algenib"
+                        )
+                    )
+                ),
+                context_window_compression=types.ContextWindowCompressionConfig(
+                    trigger_tokens=25600,
+                    sliding_window=types.SlidingWindow(target_tokens=12800),
+                ),
+                system_instruction=types.Content(
+                    parts=[types.Part.from_text(text=self.system_prompt)], role="user"
+                ),
+            )
+        return types.LiveConnectConfig(
+            response_modalities=["AUDIO"],
+            media_resolution="MEDIA_RESOLUTION_MEDIUM",
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                        voice_name="Algenib"
+                    )
+                )
+            ),
+            context_window_compression=types.ContextWindowCompressionConfig(
+                trigger_tokens=25600,
+                sliding_window=types.SlidingWindow(target_tokens=12800),
+            ),
+        )
 
     async def listen_audio(self):
         self.input_stream = await asyncio.to_thread(
@@ -98,7 +131,7 @@ class VoiceChat:
                 audio_data = await asyncio.wait_for(self.out_queue.get(), timeout=1.0)
             except asyncio.TimeoutError:
                 continue
-            await self.session.send(input=audio_data)
+            await self.session.send_realtime_input(audio=audio_data)
 
     async def receive_audio(self):
         while self.running:
@@ -137,23 +170,7 @@ class VoiceChat:
 
     async def run(self):
         self.running = True
-        config = CONFIG
-        if self.system_prompt:
-            config = types.LiveConnectConfig(
-                response_modalities=["AUDIO"],
-                media_resolution="MEDIA_RESOLUTION_MEDIUM",
-                speech_config=types.SpeechConfig(
-                    voice_config=types.VoiceConfig(
-                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                            voice_name="Zephyr"
-                        )
-                    )
-                ),
-                context_window_compression=types.ContextWindowCompressionConfig(
-                    trigger_tokens=25600,
-                    sliding_window=types.SlidingWindow(target_tokens=12800),
-                ),
-            )
+        config = self.get_config()
         try:
             async with (
                 client.aio.live.connect(model=MODEL, config=config) as session,
@@ -166,8 +183,6 @@ class VoiceChat:
                 tg.create_task(self.send_realtime())
                 tg.create_task(self.receive_audio())
                 tg.create_task(self.play_audio())
-                if self.system_prompt:
-                    await self.session.send(input=self.system_prompt)
                 await asyncio.Event().wait()
         except asyncio.CancelledError:
             pass
@@ -176,36 +191,9 @@ class VoiceChat:
             traceback.print_exc()
 
 
-def load_system_prompt():
-    prompt_path = os.path.join(
-        os.path.dirname(__file__), "..", "prompts", "system_prompt.md"
-    )
-    try:
-        with open(prompt_path, "r") as file:
-            return file.read()
-    except Exception:
-        return None
-
-
 def main():
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--prompt", type=str, default=None, help="Path to system prompt file"
-    )
-    args = parser.parse_args()
-    voice_chat = VoiceChat()
-    system_prompt = load_system_prompt()
-    if args.prompt:
-        try:
-            with open(args.prompt, "r") as f:
-                system_prompt = f.read()
-        except Exception:
-            pass
-    if system_prompt:
-        voice_chat.system_prompt = system_prompt
-    asyncio.run(voice_chat.run())
+    chat = VoiceChat()
+    asyncio.run(chat.run())
 
 
 if __name__ == "__main__":
