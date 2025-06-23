@@ -171,7 +171,9 @@ docker-compose.override.yml
 
 # mine
 *.wav
-/planning
+**/planning
+src/planning
 **/.DS_Store
 /temp
 /testing
+.aider*
