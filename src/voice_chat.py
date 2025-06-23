@@ -146,8 +146,6 @@ class VoiceChat:
                     self.last_gemini_audio = time_module.time()
                     self.audio_in_queue.put_nowait(data)
                     continue
-                if text := response.text:
-                    print(text, end="")
             while not self.audio_in_queue.empty():
                 self.audio_in_queue.get_nowait()
             if self.gemini_speaking:
@@ -164,6 +162,7 @@ class VoiceChat:
         self.output_stream.start()
         while self.running:
             bytestream = await self.audio_in_queue.get()
+            print("[DEBUG] Playing audio chunk")
             audio_data = np.frombuffer(bytestream, dtype=np.int16)
             audio_float = (audio_data.astype(np.float32) / 32767.0).reshape(-1, 1)
             await asyncio.to_thread(self.output_stream.write, audio_float)
