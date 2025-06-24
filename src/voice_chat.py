@@ -160,7 +160,7 @@ class VoiceChat:
                         ),
                     ),
                     types.FunctionDeclaration(
-                        name="get_audio_status",
+                        name="get_status",
                         description="Get current status of background audio",
                         parameters=types.Schema(type=types.Type.OBJECT),
                     ),
@@ -263,7 +263,6 @@ class VoiceChat:
         while self.running:
             turn = self.session.receive()
             async for response in turn:
-                print(f"[RAW RESPONSE] {response}")
                 if not self.running:
                     break
 
@@ -272,28 +271,29 @@ class VoiceChat:
                         self.gemini_speaking = True
                     self.last_gemini_audio = time_module.time()
                     self.audio_in_queue.put_nowait(data)
-                    continue
 
-                if hasattr(response, "candidates") and response.candidates:
-                    for candidate in response.candidates:
-                        if hasattr(candidate, "content") and candidate.content:
-                            for part in candidate.content.parts:
-                                if hasattr(part, "text") and part.text:
-                                    print(f"Narrator: {part.text}")
-                                if (
-                                    hasattr(part, "function_call")
-                                    and part.function_call
-                                ):
-                                    function_call = part.function_call
-                                    print(f"Executing function: {function_call.name}")
-                                    result = self.execute_function(function_call)
-                                    await self.session.send(
-                                        input=types.FunctionResponse(
-                                            name=function_call.name,
-                                            id=function_call.id,
-                                            response={"result": result},
-                                        )
+                if server_content := response.server_content:
+                    if model_turn := server_content.model_turn:
+                        for part in model_turn.parts:
+                            if part.text:
+                                print(f"Narrator: {part.text}")
+                            if fc := part.function_call:
+                                print(f"Executing function: {fc.name}")
+                                result = self.execute_function(fc)
+                                await self.session.send(
+                                    input=types.Content(
+                                        parts=[
+                                            types.Part(
+                                                function_response=types.FunctionResponse(
+                                                    name=fc.name,
+                                                    response={"result": result},
+                                                )
+                                            )
+                                        ],
+                                        role="tool",
                                     )
+                                )
+
             while not self.audio_in_queue.empty():
                 self.audio_in_queue.get_nowait()
             if self.gemini_speaking:

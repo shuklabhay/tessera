@@ -8,6 +8,8 @@ from .noise_generator import NoiseGenerator
 
 class AudioController:
     def __init__(self):
+        pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
+        pygame.mixer.init()
         self.loader = AudioLoader()
         self.mixer = AudioMixer()
         self.noise_gen = NoiseGenerator()
@@ -23,9 +25,12 @@ class AudioController:
         print("--- TOOL CALL: play_environmental_sound ---")
         audio = self.loader.get_cached_audio("environmental")
         if audio:
-            sound = pygame.sndarray.make_sound(
-                np.array(audio.get_array_of_samples()).reshape(-1, 1)
-            )
+            audio_array = np.array(audio.get_array_of_samples())
+            if audio.channels == 2:
+                audio_array = audio_array.reshape((-1, 2))
+            else:
+                audio_array = audio_array.reshape((-1, 1))
+            sound = pygame.sndarray.make_sound(audio_array)
             channel = self.channel_map["environmental"]
             self.mixer.play(sound, channel, loops=-1, volume=volume)
             self.active_streams["environmental"] = channel
@@ -36,9 +41,12 @@ class AudioController:
         print("--- TOOL CALL: play_speaker_sound ---")
         audio = self.loader.get_cached_audio("speakers")
         if audio:
-            sound = pygame.sndarray.make_sound(
-                np.array(audio.get_array_of_samples()).reshape(-1, 1)
-            )
+            audio_array = np.array(audio.get_array_of_samples())
+            if audio.channels == 2:
+                audio_array = audio_array.reshape((-1, 2))
+            else:
+                audio_array = audio_array.reshape((-1, 1))
+            sound = pygame.sndarray.make_sound(audio_array)
             channel = self.channel_map["speakers"]
             self.mixer.play(sound, channel, loops=-1, volume=volume)
             self.active_streams["speakers"] = channel
@@ -49,9 +57,12 @@ class AudioController:
         print("--- TOOL CALL: play_noise_sound ---")
         audio = self.loader.get_cached_audio("noise")
         if audio:
-            sound = pygame.sndarray.make_sound(
-                np.array(audio.get_array_of_samples()).reshape(-1, 1)
-            )
+            audio_array = np.array(audio.get_array_of_samples())
+            if audio.channels == 2:
+                audio_array = audio_array.reshape((-1, 2))
+            else:
+                audio_array = audio_array.reshape((-1, 1))
+            sound = pygame.sndarray.make_sound(audio_array)
             channel = self.channel_map["noise"]
             self.mixer.play(sound, channel, loops=-1, volume=volume)
             self.active_streams["noise"] = channel
@@ -61,7 +72,9 @@ class AudioController:
     def generate_white_noise(self, volume=0.3, duration=10):
         print("--- TOOL CALL: generate_white_noise ---")
         noise_data = self.noise_gen.white(duration, amplitude=volume)
-        sound = pygame.sndarray.make_sound(noise_data.reshape(-1, 1))
+        noise_data = (noise_data * 32767).astype(np.int16)
+        noise_stereo = np.column_stack((noise_data, noise_data))
+        sound = pygame.sndarray.make_sound(noise_stereo)
         channel = self.channel_map["procedural_noise"]
         self.mixer.play(sound, channel, loops=-1, volume=1.0)
         self.active_streams["white_noise"] = channel
@@ -70,7 +83,9 @@ class AudioController:
     def generate_pink_noise(self, volume=0.3, duration=10):
         print("--- TOOL CALL: generate_pink_noise ---")
         noise_data = self.noise_gen.pink(duration, amplitude=volume)
-        sound = pygame.sndarray.make_sound(noise_data.reshape(-1, 1))
+        noise_data = (noise_data * 32767).astype(np.int16)
+        noise_stereo = np.column_stack((noise_data, noise_data))
+        sound = pygame.sndarray.make_sound(noise_stereo)
         channel = self.channel_map["procedural_noise"]
         self.mixer.play(sound, channel, loops=-1, volume=1.0)
         self.active_streams["pink_noise"] = channel

@@ -5,27 +5,35 @@ import pygame
 
 class AudioMixer:
     def __init__(self, num_channels=8):
-        pygame.mixer.init()
+        if not pygame.mixer.get_init():
+            pygame.mixer.init()
         pygame.mixer.set_num_channels(num_channels)
         self.channels = [pygame.mixer.Channel(i) for i in range(num_channels)]
         self.lock = Lock()
 
     def play(self, sound, channel_idx, loops=0, volume=1.0):
         with self.lock:
-            ch = self.channels[channel_idx]
-            ch.set_volume(volume)
-            ch.play(sound, loops=loops)
+            if channel_idx < len(self.channels):
+                ch = self.channels[channel_idx]
+                ch.set_volume(volume)
+                ch.play(sound, loops=loops)
+            else:
+                print(f"Warning: Channel {channel_idx} does not exist")
 
     def stop(self, channel_idx):
         with self.lock:
-            self.channels[channel_idx].stop()
+            if channel_idx < len(self.channels):
+                self.channels[channel_idx].stop()
 
     def set_volume(self, channel_idx, volume):
         with self.lock:
-            self.channels[channel_idx].set_volume(volume)
+            if channel_idx < len(self.channels):
+                self.channels[channel_idx].set_volume(volume)
 
     def is_playing(self, channel_idx):
-        return self.channels[channel_idx].get_busy()
+        if channel_idx < len(self.channels):
+            return self.channels[channel_idx].get_busy()
+        return False
 
     def stop_all(self):
         with self.lock:

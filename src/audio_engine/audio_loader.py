@@ -4,10 +4,15 @@ from threading import Lock, Thread
 
 from pydub import AudioSegment
 
+# Get the project root directory (two levels up from this file)
+PROJECT_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+
 AUDIO_DIRS = {
-    "environmental": "audio/environmental",
-    "noise": "audio/noise",
-    "speakers": "audio/speakers",
+    "environmental": os.path.join(PROJECT_ROOT, "audio", "environmental"),
+    "noise": os.path.join(PROJECT_ROOT, "audio", "noise"),
+    "speakers": os.path.join(PROJECT_ROOT, "audio", "speakers"),
 }
 
 
@@ -19,11 +24,23 @@ class AudioLoader:
 
     def _scan_files(self, category):
         path = AUDIO_DIRS[category]
-        return [
-            os.path.join(path, f)
-            for f in os.listdir(path)
-            if f.lower().endswith(".wav")
-        ]
+        print(f"Scanning audio directory: {path}")
+        if not os.path.exists(path):
+            print(f"Warning: Audio directory {path} does not exist")
+            return []
+        try:
+            files = [
+                os.path.join(path, f)
+                for f in os.listdir(path)
+                if f.lower().endswith((".wav", ".mp3", ".ogg"))
+            ]
+            print(
+                f"Found {len(files)} audio files in {category}: {[os.path.basename(f) for f in files]}"
+            )
+            return files
+        except Exception as e:
+            print(f"Error scanning {path}: {e}")
+            return []
 
     def get_random_file(self, category):
         files = self._scan_files(category)
@@ -32,7 +49,18 @@ class AudioLoader:
         return random.choice(files)
 
     def load_audio(self, filepath):
-        return AudioSegment.from_wav(filepath)
+        try:
+            if filepath.lower().endswith(".wav"):
+                return AudioSegment.from_wav(filepath)
+            elif filepath.lower().endswith(".mp3"):
+                return AudioSegment.from_mp3(filepath)
+            elif filepath.lower().endswith(".ogg"):
+                return AudioSegment.from_ogg(filepath)
+            else:
+                return AudioSegment.from_file(filepath)
+        except Exception as e:
+            print(f"Error loading audio file {filepath}: {e}")
+            return None
 
     def get_random_audio(self, category):
         filepath = self.get_random_file(category)
@@ -45,11 +73,15 @@ class AudioLoader:
         loaded = []
         for f in files:
             try:
-                loaded.append(self.load_audio(f))
-            except Exception:
+                audio = self.load_audio(f)
+                if audio is not None:
+                    loaded.append(audio)
+            except Exception as e:
+                print(f"Error loading {f}: {e}")
                 continue
         with self.lock:
             self.cache[category] = loaded
+        print(f"Cached {len(loaded)} {category} audio files")
 
     def _background_cache(self):
         for category in AUDIO_DIRS:
@@ -61,6 +93,11 @@ class AudioLoader:
 
     def get_cached_audio(self, category):
         with self.lock:
+            print(f"Requesting cached audio for category: {category}")
+            print(f"Available cached files for {category}: {len(self.cache[category])}")
             if not self.cache[category]:
+                print(f"No cached audio available for {category}")
                 return None
-            return random.choice(self.cache[category])
+            selected = random.choice(self.cache[category])
+            print(f"Selected cached audio for {category} (duration: {len(selected)}ms)")
+            return selected
