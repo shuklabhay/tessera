@@ -7,11 +7,14 @@ import traceback
 import certifi
 import numpy as np
 import sounddevice as sd
+from coaching_engine import CoachingEngine
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
 from audio_engine.audio_controller import AudioController
+from session.session_manager import SessionManager
+from stages.stage_manager import StageManager
 
 ssl._create_default_https_context = ssl._create_stdlib_context
 os.environ["SSL_CERT_FILE"] = certifi.where()
@@ -57,6 +60,9 @@ class VoiceChat:
         self.recording_duration = 1.5
         self.system_prompt = load_system_prompt()
         self.current_audio_amplitude = 0
+        self.session_manager = SessionManager()
+        self.stage_manager = StageManager()
+        self.coaching_engine = CoachingEngine(self.session_manager, self.stage_manager)
         self.audio_controller = AudioController()
 
     def get_tools(self):
@@ -149,6 +155,20 @@ class VoiceChat:
                         name="get_status",
                         description="Get current status of background audio",
                         parameters=types.Schema(type=types.Type.OBJECT),
+                    ),
+                    types.FunctionDeclaration(
+                        name="update_progress_log",
+                        description="Logs the user's performance summary and advances them to the next stage.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "summary": types.Schema(
+                                    type=types.Type.STRING,
+                                    description="A concise summary of the user's performance, including strengths and areas for improvement.",
+                                )
+                            },
+                            required=["summary"],
+                        ),
                     ),
                 ]
             )
@@ -250,19 +270,20 @@ class VoiceChat:
                 volume = args.get("volume", 0.3)
                 duration = args.get("duration", 10)
                 return self.audio_controller.generate_brown_noise(volume, duration)
-            elif function_name == "get_status":
-                return self.audio_controller.get_status()
             elif function_name == "stop_all_audio":
                 return self.audio_controller.stop_all_audio()
+            elif function_name == "get_status":
+                return self.audio_controller.get_status()
+            elif function_name == "update_progress_log":
+                summary = args.get("summary")
+                if summary:
+                    return self.coaching_engine.update_progress_log(summary)
+                return "Error: Summary not provided for progress log."
             else:
                 return f"Unknown function: {function_name}"
-
         except Exception as e:
-            print(f"[ERROR] Function execution failed: {e}")
-            import traceback
-
-            traceback.print_exc()
-            return f"Function execution failed: {e}"
+            print(f"Error executing function {function_call.name}: {e}")
+            return f"Error: {e}"
 
     async def receive_audio(self):
         while self.running:
@@ -326,51 +347,18 @@ class VoiceChat:
 
     async def execute_function_call(self, function_call):
         """Execute a function call and send the response back to the model"""
+        args = function_call.args if hasattr(function_call, "args") else {}
+        print(f"[EXECUTING ASYNC] Function: {function_call.name} with args: {args}")
         try:
-            function_name = function_call.name
-            args = function_call.args if hasattr(function_call, "args") else {}
-
-            print(f"[EXECUTING] Function: {function_name} with args: {args}")
-
-            # Map function calls to actual methods
-            if function_name == "play_environmental_sound":
-                volume = args.get("volume", 0.7)
-                result = self.audio_controller.play_environmental_sound(volume)
-            elif function_name == "play_speaker_sound":
-                volume = args.get("volume", 0.7)
-                result = self.audio_controller.play_speaker_sound(volume)
-            elif function_name == "generate_white_noise":
-                volume = args.get("volume", 0.3)
-                duration = args.get("duration", 10)
-                result = self.audio_controller.generate_white_noise(volume, duration)
-            elif function_name == "generate_pink_noise":
-                volume = args.get("volume", 0.3)
-                duration = args.get("duration", 10)
-                result = self.audio_controller.generate_pink_noise(volume, duration)
-            elif function_name == "generate_brown_noise":
-                volume = args.get("volume", 0.3)
-                duration = args.get("duration", 10)
-                result = self.audio_controller.generate_brown_noise(volume, duration)
-            elif function_name == "get_status":
-                result = self.audio_controller.get_status()
-            elif function_name == "stop_all_audio":
-                result = self.audio_controller.stop_all_audio()
-            else:
-                result = f"Unknown function: {function_name}"
-
-            print(f"[FUNCTION RESULT] {result}")
-
-            # Send the function response back to the model using the Live API
-            await self.send_function_response(function_name, result)
-
+            # All tools are currently synchronous, so we run them in a thread
+            result = await asyncio.to_thread(self.execute_function, function_call)
+            await self.send_function_response(function_call.name, result)
         except Exception as e:
-            print(f"[ERROR] Function execution failed: {e}")
-            import traceback
-
+            print(f"Error executing function call: {e}")
             traceback.print_exc()
 
     async def send_function_response(self, function_name, result):
-        """Send function response back to the Live API"""
+        """Sends the result of a function call back to the model."""
         try:
             # For Live API, we need to send the function response using the correct format
             function_response = types.Content(

@@ -1,9 +1,8 @@
 import numpy as np
 import pygame
-
-from .audio_loader import AudioLoader
-from .mixer import AudioMixer
-from .noise_generator import NoiseGenerator
+from audio_loader import AudioLoader
+from mixer import AudioMixer
+from noise_generator import NoiseGenerator
 
 
 class AudioController:

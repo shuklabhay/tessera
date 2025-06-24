@@ -2,8 +2,8 @@ import asyncio
 import os
 import threading
 
+from ai.voice_chat import VoiceChat
 from ui.main_app import UnlockHearingApp
-from voice_chat import VoiceChat
 
 
 def load_system_prompt():
