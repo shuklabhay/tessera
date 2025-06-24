@@ -78,20 +78,7 @@ class VoiceChat:
                     ),
                     types.FunctionDeclaration(
                         name="play_speaker_sound",
-                        description="Play random speaker audio for training",
-                        parameters=types.Schema(
-                            type=types.Type.OBJECT,
-                            properties={
-                                "volume": types.Schema(
-                                    type=types.Type.NUMBER,
-                                    description="Volume level from 0.0 to 1.0",
-                                )
-                            },
-                        ),
-                    ),
-                    types.FunctionDeclaration(
-                        name="play_noise_sound",
-                        description="Play random noise audio for masking",
+                        description="Play speaker audio content",
                         parameters=types.Schema(
                             type=types.Type.OBJECT,
                             properties={
@@ -104,60 +91,59 @@ class VoiceChat:
                     ),
                     types.FunctionDeclaration(
                         name="generate_white_noise",
-                        description="Generate procedural white noise",
+                        description="Generate white noise for focus and relaxation",
                         parameters=types.Schema(
                             type=types.Type.OBJECT,
                             properties={
                                 "volume": types.Schema(
                                     type=types.Type.NUMBER,
                                     description="Volume level from 0.0 to 1.0",
-                                )
+                                ),
+                                "duration": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="Duration in seconds",
+                                ),
                             },
                         ),
                     ),
                     types.FunctionDeclaration(
                         name="generate_pink_noise",
-                        description="Generate procedural pink noise",
+                        description="Generate pink noise for relaxation and sleep",
                         parameters=types.Schema(
                             type=types.Type.OBJECT,
                             properties={
                                 "volume": types.Schema(
                                     type=types.Type.NUMBER,
                                     description="Volume level from 0.0 to 1.0",
-                                )
+                                ),
+                                "duration": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="Duration in seconds",
+                                ),
                             },
                         ),
                     ),
                     types.FunctionDeclaration(
-                        name="adjust_volume",
-                        description="Adjust volume of specific audio stream",
+                        name="generate_brown_noise",
+                        description="Generate brown noise for deep relaxation",
                         parameters=types.Schema(
                             type=types.Type.OBJECT,
                             properties={
-                                "audio_type": types.Schema(
-                                    type=types.Type.STRING,
-                                    description="Type of audio: environmental, speakers, noise, white_noise, pink_noise",
-                                ),
                                 "volume": types.Schema(
                                     type=types.Type.NUMBER,
-                                    description="New volume level from 0.0 to 1.0",
+                                    description="Volume level from 0.0 to 1.0",
+                                ),
+                                "duration": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="Duration in seconds",
                                 ),
                             },
-                            required=["audio_type", "volume"],
                         ),
                     ),
                     types.FunctionDeclaration(
-                        name="stop_audio",
-                        description="Stop specific audio stream or all audio",
-                        parameters=types.Schema(
-                            type=types.Type.OBJECT,
-                            properties={
-                                "audio_type": types.Schema(
-                                    type=types.Type.STRING,
-                                    description="Type of audio to stop, or leave empty to stop all",
-                                )
-                            },
-                        ),
+                        name="stop_all_audio",
+                        description="Stop all currently playing audio",
+                        parameters=types.Schema(type=types.Type.OBJECT),
                     ),
                     types.FunctionDeclaration(
                         name="get_status",
@@ -168,29 +154,10 @@ class VoiceChat:
             )
         ]
 
-    def get_config(self):
+    def get_live_config(self):
         tools = self.get_tools()
-        if self.system_prompt:
-            return types.LiveConnectConfig(
-                response_modalities=["AUDIO"],
-                media_resolution="MEDIA_RESOLUTION_MEDIUM",
-                speech_config=types.SpeechConfig(
-                    voice_config=types.VoiceConfig(
-                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                            voice_name="Algenib"
-                        )
-                    )
-                ),
-                context_window_compression=types.ContextWindowCompressionConfig(
-                    trigger_tokens=25600,
-                    sliding_window=types.SlidingWindow(target_tokens=12800),
-                ),
-                system_instruction=types.Content(
-                    parts=[types.Part.from_text(text=self.system_prompt)], role="user"
-                ),
-                tools=tools,
-            )
-        return types.LiveConnectConfig(
+
+        config = types.LiveConnectConfig(
             response_modalities=["AUDIO"],
             media_resolution="MEDIA_RESOLUTION_MEDIUM",
             speech_config=types.SpeechConfig(
@@ -205,7 +172,27 @@ class VoiceChat:
                 sliding_window=types.SlidingWindow(target_tokens=12800),
             ),
             tools=tools,
+            # Add system instruction to prefer function calling over code execution
+            system_instruction=types.Content(
+                parts=[
+                    types.Part.from_text(
+                        text="""You are an AI assistant with audio control capabilities. 
+When users ask for audio functions like playing sounds, generating noise, or controlling audio, 
+you should use the provided function calls directly rather than writing code. 
+Available functions:
+- play_environmental_sound(volume) - plays ambient nature sounds
+- play_speaker_sound(volume) - plays speaker audio  
+- generate_white_noise(volume, duration) - generates white noise
+- generate_pink_noise(volume, duration) - generates pink noise
+- generate_brown_noise(volume, duration) - generates brown noise
+- get_status() - gets current audio status
+Always use these functions when users request audio functionality."""
+                    )
+                ],
+                role="user",
+            ),
         )
+        return config
 
     async def listen_audio(self):
         self.input_stream = await asyncio.to_thread(
@@ -249,15 +236,45 @@ class VoiceChat:
             await self.session.send_realtime_input(audio=audio_data)
 
     def execute_function(self, function_call):
-        func_name = function_call.name
-        args = {k: v for k, v in function_call.args.items()}
+        """Execute a function call synchronously"""
+        try:
+            function_name = function_call.name
+            args = function_call.args if hasattr(function_call, "args") else {}
 
-        if hasattr(self.audio_controller, func_name):
-            method = getattr(self.audio_controller, func_name)
-            result = method(**args)
-            return result
-        else:
-            return f"Unknown function: {func_name}"
+            print(f"[EXECUTING SYNC] Function: {function_name} with args: {args}")
+
+            # Map function calls to actual methods
+            if function_name == "play_environmental_sound":
+                volume = args.get("volume", 0.7)
+                return self.audio_controller.play_environmental_sound(volume)
+            elif function_name == "play_speaker_sound":
+                volume = args.get("volume", 0.7)
+                return self.audio_controller.play_speaker_sound(volume)
+            elif function_name == "generate_white_noise":
+                volume = args.get("volume", 0.3)
+                duration = args.get("duration", 10)
+                return self.audio_controller.generate_white_noise(volume, duration)
+            elif function_name == "generate_pink_noise":
+                volume = args.get("volume", 0.3)
+                duration = args.get("duration", 10)
+                return self.audio_controller.generate_pink_noise(volume, duration)
+            elif function_name == "generate_brown_noise":
+                volume = args.get("volume", 0.3)
+                duration = args.get("duration", 10)
+                return self.audio_controller.generate_brown_noise(volume, duration)
+            elif function_name == "get_status":
+                return self.audio_controller.get_status()
+            elif function_name == "stop_all_audio":
+                return self.audio_controller.stop_all_audio()
+            else:
+                return f"Unknown function: {function_name}"
+
+        except Exception as e:
+            print(f"[ERROR] Function execution failed: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return f"Function execution failed: {e}"
 
     async def receive_audio(self):
         while self.running:
@@ -277,27 +294,120 @@ class VoiceChat:
                         for part in model_turn.parts:
                             if part.text:
                                 print(f"Narrator: {part.text}")
-                            if fc := part.function_call:
-                                print(f"Executing function: {fc.name}")
-                                result = self.execute_function(fc)
-                                await self.session.send(
-                                    input=types.Content(
-                                        parts=[
-                                            types.Part(
-                                                function_response=types.FunctionResponse(
-                                                    name=fc.name,
-                                                    response={"result": result},
-                                                )
-                                            )
-                                        ],
-                                        role="tool",
-                                    )
+
+                            # Check for function calls in the Live API response
+                            if hasattr(part, "function_call") and part.function_call:
+                                print(
+                                    f"[FUNCTION CALL] Found function call: {part.function_call.name}"
                                 )
+                                print(
+                                    f"[FUNCTION CALL] Arguments: {part.function_call.args}"
+                                )
+
+                                # Execute the function call
+                                await self.execute_function_call(part.function_call)
+
+                            # Also check for executable code or other function call formats
+                            elif (
+                                hasattr(part, "executable_code")
+                                and part.executable_code
+                            ):
+                                print(
+                                    f"[EXECUTABLE CODE] Found: {part.executable_code}"
+                                )
+                                # Try to execute audio functions if they're called in code
+                                await self.handle_executable_code(part.executable_code)
+
+                            # Check if there are function calls in a different structure
+                            elif hasattr(part, "functionCall") and part.functionCall:
+                                print(
+                                    f"[FUNCTION CALL] Found camelCase function call: {part.functionCall.name}"
+                                )
+                                await self.execute_function_call(part.functionCall)
+
+                # Check if the entire response has function calls
+                if hasattr(response, "function_calls") and response.function_calls:
+                    for function_call in response.function_calls:
+                        print(
+                            f"[FUNCTION CALL] Response-level function call: {function_call.name}"
+                        )
+                        await self.execute_function_call(function_call)
 
             while not self.audio_in_queue.empty():
                 self.audio_in_queue.get_nowait()
             if self.gemini_speaking:
                 self.gemini_speaking = False
+
+    async def execute_function_call(self, function_call):
+        """Execute a function call and send the response back to the model"""
+        try:
+            function_name = function_call.name
+            args = function_call.args if hasattr(function_call, "args") else {}
+
+            print(f"[EXECUTING] Function: {function_name} with args: {args}")
+
+            # Map function calls to actual methods
+            if function_name == "play_environmental_sound":
+                volume = args.get("volume", 0.7)
+                result = self.audio_controller.play_environmental_sound(volume)
+            elif function_name == "play_speaker_sound":
+                volume = args.get("volume", 0.7)
+                result = self.audio_controller.play_speaker_sound(volume)
+            elif function_name == "generate_white_noise":
+                volume = args.get("volume", 0.3)
+                duration = args.get("duration", 10)
+                result = self.audio_controller.generate_white_noise(volume, duration)
+            elif function_name == "generate_pink_noise":
+                volume = args.get("volume", 0.3)
+                duration = args.get("duration", 10)
+                result = self.audio_controller.generate_pink_noise(volume, duration)
+            elif function_name == "generate_brown_noise":
+                volume = args.get("volume", 0.3)
+                duration = args.get("duration", 10)
+                result = self.audio_controller.generate_brown_noise(volume, duration)
+            elif function_name == "get_status":
+                result = self.audio_controller.get_status()
+            elif function_name == "stop_all_audio":
+                result = self.audio_controller.stop_all_audio()
+            else:
+                result = f"Unknown function: {function_name}"
+
+            print(f"[FUNCTION RESULT] {result}")
+
+            # Send the function response back to the model using the Live API
+            await self.send_function_response(function_name, result)
+
+        except Exception as e:
+            print(f"[ERROR] Function execution failed: {e}")
+            import traceback
+
+            traceback.print_exc()
+
+    async def send_function_response(self, function_name, result):
+        """Send function response back to the Live API"""
+        try:
+            # For Live API, we need to send the function response using the correct format
+            function_response = types.Content(
+                parts=[
+                    types.Part(
+                        function_response=types.FunctionResponse(
+                            name=function_name,
+                            response={"result": result},
+                        )
+                    )
+                ],
+                role="user",
+            )
+
+            # Send the function response back to the session
+            await self.session.send(input=function_response)
+            print(f"[SENT] Function response back to model: {result}")
+
+        except Exception as e:
+            print(f"[ERROR] Failed to send function response: {e}")
+            import traceback
+
+            traceback.print_exc()
 
     async def play_audio(self):
         self.output_stream = await asyncio.to_thread(
@@ -323,7 +433,7 @@ class VoiceChat:
         self.running = True
         try:
             async with client.aio.live.connect(
-                model=MODEL, config=self.get_config()
+                model=MODEL, config=self.get_live_config()
             ) as session:
                 self.session = session
                 self.audio_in_queue = asyncio.Queue()
@@ -339,6 +449,54 @@ class VoiceChat:
                 )
         except Exception as e:
             print(f"An error occurred: {e}")
+            traceback.print_exc()
+
+    async def handle_executable_code(self, executable_code):
+        """Handle executable code that might contain audio function calls"""
+        try:
+            code = (
+                executable_code.code
+                if hasattr(executable_code, "code")
+                else str(executable_code)
+            )
+            print(f"[CODE] Attempting to handle: {code}")
+
+            # Check if the code is trying to call our audio functions
+            if "generate_white_noise" in code:
+                print("[CODE EXECUTION] Executing white noise generation")
+                result = self.audio_controller.generate_white_noise(0.3, 10)
+                print(f"[CODE RESULT] {result}")
+            elif "generate_pink_noise" in code:
+                print("[CODE EXECUTION] Executing pink noise generation")
+                result = self.audio_controller.generate_pink_noise(0.3, 10)
+                print(f"[CODE RESULT] {result}")
+            elif "generate_brown_noise" in code:
+                print("[CODE EXECUTION] Executing brown noise generation")
+                result = self.audio_controller.generate_brown_noise(0.3, 10)
+                print(f"[CODE RESULT] {result}")
+            elif "play_environmental_sound" in code:
+                print("[CODE EXECUTION] Playing environmental sound")
+                result = self.audio_controller.play_environmental_sound(0.7)
+                print(f"[CODE RESULT] {result}")
+            elif "play_speaker_sound" in code:
+                print("[CODE EXECUTION] Playing speaker sound")
+                result = self.audio_controller.play_speaker_sound(0.7)
+                print(f"[CODE RESULT] {result}")
+            elif "get_status" in code:
+                print("[CODE EXECUTION] Getting audio status")
+                result = self.audio_controller.get_status()
+                print(f"[CODE RESULT] {result}")
+            elif "stop_all_audio" in code:
+                print("[CODE EXECUTION] Stopping all audio")
+                result = self.audio_controller.stop_all_audio()
+                print(f"[CODE RESULT] {result}")
+            else:
+                print(f"[CODE] Unhandled code: {code}")
+
+        except Exception as e:
+            print(f"[ERROR] Code execution failed: {e}")
+            import traceback
+
             traceback.print_exc()
 
 

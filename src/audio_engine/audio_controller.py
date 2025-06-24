@@ -121,3 +121,12 @@ class AudioController:
         if active:
             return f"Currently playing: {', '.join(active)}"
         return "No background audio currently playing"
+
+    def stop_all_audio(self):
+        print("--- TOOL CALL: stop_all_audio ---")
+        stopped_streams = []
+        for stream_name, channel in self.active_streams.items():
+            self.mixer.stop(channel)
+            stopped_streams.append(stream_name)
+        self.active_streams.clear()
+        return f"Stopped all audio streams: {', '.join(stopped_streams) if stopped_streams else 'No active streams'}"
