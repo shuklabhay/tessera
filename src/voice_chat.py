@@ -157,6 +157,12 @@ class VoiceChat:
     def get_live_config(self):
         tools = self.get_tools()
 
+        system_instruction = None
+        if self.system_prompt:
+            system_instruction = types.Content(
+                parts=[types.Part.from_text(text=self.system_prompt)], role="user"
+            )
+
         config = types.LiveConnectConfig(
             response_modalities=["AUDIO"],
             media_resolution="MEDIA_RESOLUTION_MEDIUM",
@@ -172,25 +178,7 @@ class VoiceChat:
                 sliding_window=types.SlidingWindow(target_tokens=12800),
             ),
             tools=tools,
-            # Add system instruction to prefer function calling over code execution
-            system_instruction=types.Content(
-                parts=[
-                    types.Part.from_text(
-                        text="""You are an AI assistant with audio control capabilities. 
-When users ask for audio functions like playing sounds, generating noise, or controlling audio, 
-you should use the provided function calls directly rather than writing code. 
-Available functions:
-- play_environmental_sound(volume) - plays ambient nature sounds
-- play_speaker_sound(volume) - plays speaker audio  
-- generate_white_noise(volume, duration) - generates white noise
-- generate_pink_noise(volume, duration) - generates pink noise
-- generate_brown_noise(volume, duration) - generates brown noise
-- get_status() - gets current audio status
-Always use these functions when users request audio functionality."""
-                    )
-                ],
-                role="user",
-            ),
+            system_instruction=system_instruction,
         )
         return config
 
@@ -333,8 +321,6 @@ Always use these functions when users request audio functionality."""
                         )
                         await self.execute_function_call(function_call)
 
-            while not self.audio_in_queue.empty():
-                self.audio_in_queue.get_nowait()
             if self.gemini_speaking:
                 self.gemini_speaking = False
 
