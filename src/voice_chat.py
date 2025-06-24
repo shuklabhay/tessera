@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
+from audio_engine.audio_controller import AudioController
+
 ssl._create_default_https_context = ssl._create_stdlib_context
 os.environ["SSL_CERT_FILE"] = certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
@@ -55,8 +57,119 @@ class VoiceChat:
         self.recording_duration = 1.5
         self.system_prompt = load_system_prompt()
         self.current_audio_amplitude = 0
+        self.audio_controller = AudioController()
+
+    def get_tools(self):
+        return [
+            types.Tool(
+                function_declarations=[
+                    types.FunctionDeclaration(
+                        name="play_environmental_sound",
+                        description="Play random environmental background sound (nature, rain, etc)",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "volume": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="Volume level from 0.0 to 1.0",
+                                )
+                            },
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="play_speaker_sound",
+                        description="Play random speaker audio for training",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "volume": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="Volume level from 0.0 to 1.0",
+                                )
+                            },
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="play_noise_sound",
+                        description="Play random noise audio for masking",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "volume": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="Volume level from 0.0 to 1.0",
+                                )
+                            },
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="generate_white_noise",
+                        description="Generate procedural white noise",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "volume": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="Volume level from 0.0 to 1.0",
+                                )
+                            },
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="generate_pink_noise",
+                        description="Generate procedural pink noise",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "volume": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="Volume level from 0.0 to 1.0",
+                                )
+                            },
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="adjust_volume",
+                        description="Adjust volume of specific audio stream",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "audio_type": types.Schema(
+                                    type=types.Type.STRING,
+                                    description="Type of audio: environmental, speakers, noise, white_noise, pink_noise",
+                                ),
+                                "volume": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="New volume level from 0.0 to 1.0",
+                                ),
+                            },
+                            required=["audio_type", "volume"],
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="stop_audio",
+                        description="Stop specific audio stream or all audio",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "audio_type": types.Schema(
+                                    type=types.Type.STRING,
+                                    description="Type of audio to stop, or leave empty to stop all",
+                                )
+                            },
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="get_audio_status",
+                        description="Get current status of background audio",
+                        parameters=types.Schema(type=types.Type.OBJECT),
+                    ),
+                ]
+            )
+        ]
 
     def get_config(self):
+        tools = self.get_tools()
         if self.system_prompt:
             return types.LiveConnectConfig(
                 response_modalities=["AUDIO"],
@@ -75,6 +188,7 @@ class VoiceChat:
                 system_instruction=types.Content(
                     parts=[types.Part.from_text(text=self.system_prompt)], role="user"
                 ),
+                tools=tools,
             )
         return types.LiveConnectConfig(
             response_modalities=["AUDIO"],
@@ -90,6 +204,7 @@ class VoiceChat:
                 trigger_tokens=25600,
                 sliding_window=types.SlidingWindow(target_tokens=12800),
             ),
+            tools=tools,
         )
 
     async def listen_audio(self):
@@ -133,24 +248,56 @@ class VoiceChat:
                 continue
             await self.session.send_realtime_input(audio=audio_data)
 
+    def execute_function(self, function_call):
+        func_name = function_call.name
+        args = {k: v for k, v in function_call.args.items()}
+
+        if hasattr(self.audio_controller, func_name):
+            method = getattr(self.audio_controller, func_name)
+            result = method(**args)
+            return result
+        else:
+            return f"Unknown function: {func_name}"
+
     async def receive_audio(self):
         while self.running:
             turn = self.session.receive()
             async for response in turn:
+                print(f"[RAW RESPONSE] {response}")
                 if not self.running:
                     break
+
                 if data := response.data:
                     if not self.gemini_speaking:
-                        print("[DEBUG] Gemini speaking started")
-                    self.gemini_speaking = True
+                        self.gemini_speaking = True
                     self.last_gemini_audio = time_module.time()
                     self.audio_in_queue.put_nowait(data)
                     continue
+
+                if hasattr(response, "candidates") and response.candidates:
+                    for candidate in response.candidates:
+                        if hasattr(candidate, "content") and candidate.content:
+                            for part in candidate.content.parts:
+                                if hasattr(part, "text") and part.text:
+                                    print(f"Narrator: {part.text}")
+                                if (
+                                    hasattr(part, "function_call")
+                                    and part.function_call
+                                ):
+                                    function_call = part.function_call
+                                    print(f"Executing function: {function_call.name}")
+                                    result = self.execute_function(function_call)
+                                    await self.session.send(
+                                        input=types.FunctionResponse(
+                                            name=function_call.name,
+                                            id=function_call.id,
+                                            response={"result": result},
+                                        )
+                                    )
             while not self.audio_in_queue.empty():
                 self.audio_in_queue.get_nowait()
             if self.gemini_speaking:
-                print("[DEBUG] Gemini speaking ended")
-            self.gemini_speaking = False
+                self.gemini_speaking = False
 
     async def play_audio(self):
         self.output_stream = await asyncio.to_thread(
@@ -161,32 +308,37 @@ class VoiceChat:
         )
         self.output_stream.start()
         while self.running:
-            bytestream = await self.audio_in_queue.get()
-            print("[DEBUG] Playing audio chunk")
-            audio_data = np.frombuffer(bytestream, dtype=np.int16)
-            audio_float = (audio_data.astype(np.float32) / 32767.0).reshape(-1, 1)
-            await asyncio.to_thread(self.output_stream.write, audio_float)
+            try:
+                bytestream = await asyncio.wait_for(
+                    self.audio_in_queue.get(), timeout=1.0
+                )
+                audio_data = np.frombuffer(bytestream, dtype=np.int16)
+                audio_float = (audio_data.astype(np.float32) / 32767.0).reshape(-1, 1)
+                await asyncio.to_thread(self.output_stream.write, audio_float)
+            except asyncio.TimeoutError:
+                self.gemini_speaking = False
+                continue
 
     async def run(self):
         self.running = True
-        config = self.get_config()
         try:
-            async with (
-                client.aio.live.connect(model=MODEL, config=config) as session,
-                asyncio.TaskGroup() as tg,
-            ):
+            async with client.aio.live.connect(
+                model=MODEL, config=self.get_config()
+            ) as session:
                 self.session = session
                 self.audio_in_queue = asyncio.Queue()
-                self.out_queue = asyncio.Queue(maxsize=5)
-                tg.create_task(self.listen_audio())
-                tg.create_task(self.send_realtime())
-                tg.create_task(self.receive_audio())
-                tg.create_task(self.play_audio())
-                await asyncio.Event().wait()
-        except asyncio.CancelledError:
-            pass
+                self.out_queue = asyncio.Queue(maxsize=100)
+
+                listen_task = asyncio.create_task(self.listen_audio())
+                sender_task = asyncio.create_task(self.send_realtime())
+                receiver_task = asyncio.create_task(self.receive_audio())
+                player_task = asyncio.create_task(self.play_audio())
+
+                await asyncio.gather(
+                    listen_task, sender_task, receiver_task, player_task
+                )
         except Exception as e:
-            print("[ERROR]", e)
+            print(f"An error occurred: {e}")
             traceback.print_exc()
 
 
