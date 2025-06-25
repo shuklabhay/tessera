@@ -56,17 +56,13 @@ class MainLayout(FloatLayout):
         if not self.llm_manager:
             return
 
-        # If Gemini is speaking, animate the orb
-        if (
-            hasattr(self.llm_manager, "gemini_speaking")
-            and self.llm_manager.gemini_speaking
-        ):
-            last_audio = self.llm_manager.last_gemini_audio
-            if last_audio:
-                amplitude = self.audio_visualizer.process_audio(last_audio)
-                self.orb.update_from_amplitude(amplitude * 2.5)
-        else:
-            # When not speaking, return to idle animation
+        try:
+            # Process Gemini's output audio for visualization
+            audio_chunk = self.llm_manager.viz_queue.get_nowait()
+            amplitude = self.audio_visualizer.process_audio(audio_chunk)
+            self.orb.update_from_amplitude(amplitude * 2.5)
+        except Exception:
+            # If no audio or an error, return to idle
             self.orb.start_idle_animation(delay=0.5)
 
 

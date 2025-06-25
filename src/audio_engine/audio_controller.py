@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import pygame
 
@@ -21,8 +23,9 @@ class AudioController:
             "procedural_noise": 3,
         }
 
-    def play_environmental_sound(self, volume=0.7):
+    def play_environmental_sound(self):
         print("--- TOOL CALL: play_environmental_sound ---")
+        volume = 0.7  # Hardcoded volume
         audio = self.loader.get_cached_audio("environmental")
         if audio:
             audio_array = np.array(audio.get_array_of_samples())
@@ -37,8 +40,9 @@ class AudioController:
             return f"Playing environmental sound at {int(volume*100)}% volume"
         return "No environmental sounds available"
 
-    def play_speaker_sound(self, volume=0.7):
+    def play_speaker_sound(self):
         print("--- TOOL CALL: play_speaker_sound ---")
+        volume = 0.7  # Hardcoded volume
         audio = self.loader.get_cached_audio("speakers")
         if audio:
             audio_array = np.array(audio.get_array_of_samples())
@@ -53,8 +57,9 @@ class AudioController:
             return f"Playing speaker audio at {int(volume*100)}% volume"
         return "No speaker audio available"
 
-    def play_noise_sound(self, volume=0.5):
+    def play_noise_sound(self):
         print("--- TOOL CALL: play_noise_sound ---")
+        volume = 0.7  # Hardcoded volume
         audio = self.loader.get_cached_audio("noise")
         if audio:
             audio_array = np.array(audio.get_array_of_samples())
@@ -69,8 +74,9 @@ class AudioController:
             return f"Playing noise audio at {int(volume*100)}% volume"
         return "No noise audio available"
 
-    def generate_white_noise(self, volume=0.3, duration=10):
+    def generate_white_noise(self, duration=10):
         print("--- TOOL CALL: generate_white_noise ---")
+        volume = 0.7  # Hardcoded volume
         noise_data = self.noise_gen.white(duration, amplitude=volume)
         noise_data = (noise_data * 32767).astype(np.int16)
         noise_stereo = np.column_stack((noise_data, noise_data))
@@ -80,8 +86,9 @@ class AudioController:
         self.active_streams["white_noise"] = channel
         return f"Generating white noise at {int(volume*100)}% volume"
 
-    def generate_pink_noise(self, volume=0.3, duration=10):
+    def generate_pink_noise(self, duration=10):
         print("--- TOOL CALL: generate_pink_noise ---")
+        volume = 0.7  # Hardcoded volume
         noise_data = self.noise_gen.pink(duration, amplitude=volume)
         noise_data = (noise_data * 32767).astype(np.int16)
         noise_stereo = np.column_stack((noise_data, noise_data))

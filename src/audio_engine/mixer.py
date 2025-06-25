@@ -13,12 +13,9 @@ class AudioMixer:
 
     def play(self, sound, channel_idx, loops=0, volume=1.0):
         with self.lock:
-            if channel_idx < len(self.channels):
-                ch = self.channels[channel_idx]
-                ch.set_volume(volume)
-                ch.play(sound, loops=loops)
-            else:
-                print(f"Warning: Channel {channel_idx} does not exist")
+            ch = self.channels[channel_idx]
+            ch.set_volume(volume)
+            ch.play(sound, loops=loops)
 
     def stop(self, channel_idx):
         with self.lock:

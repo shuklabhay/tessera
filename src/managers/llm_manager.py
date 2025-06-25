@@ -46,10 +46,11 @@ class LLMManager:
     def __init__(self):
         self.audio_in_queue = asyncio.Queue()
         self.out_queue = asyncio.Queue()
+        self.viz_queue = asyncio.Queue()
         self.session = None
         self.input_stream = None
         self.output_stream = None
-        self.running = False
+        self.running = True
         self.gemini_speaking = False
         self.last_gemini_audio = None
         self.speech_threshold = 200  # Adjusted for np.linalg.norm
@@ -59,6 +60,7 @@ class LLMManager:
         self.state_manager = StateManager()
         self.system_prompt = self._get_contextual_system_prompt()
         self.audio_controller = AudioController()
+        self.user_input_text = ""
 
     def _get_contextual_system_prompt(self):
         """
@@ -82,61 +84,42 @@ class LLMManager:
                 function_declarations=[
                     types.FunctionDeclaration(
                         name="play_environmental_sound",
-                        description="Play a random environmental background sound.",
-                        parameters=types.Schema(
-                            type=types.Type.OBJECT,
-                            properties={
-                                "volume": types.Schema(
-                                    type=types.Type.NUMBER,
-                                    description="Volume from 0.0 to 1.0",
-                                )
-                            },
-                        ),
+                        description="Play a random environmental soundscape.",
+                        parameters=types.Schema(type=types.Type.OBJECT),
                     ),
                     types.FunctionDeclaration(
                         name="play_speaker_sound",
                         description="Play a random audio clip of a person speaking.",
-                        parameters=types.Schema(
-                            type=types.Type.OBJECT,
-                            properties={
-                                "volume": types.Schema(
-                                    type=types.Type.NUMBER,
-                                    description="Volume from 0.0 to 1.0",
-                                )
-                            },
-                        ),
+                        parameters=types.Schema(type=types.Type.OBJECT),
+                    ),
+                    types.FunctionDeclaration(
+                        name="play_noise_sound",
+                        description="Play a random pre-recorded noise file.",
+                        parameters=types.Schema(type=types.Type.OBJECT),
                     ),
                     types.FunctionDeclaration(
                         name="generate_white_noise",
-                        description="Generate white noise.",
+                        description="Generate continuous white noise.",
                         parameters=types.Schema(
                             type=types.Type.OBJECT,
                             properties={
-                                "volume": types.Schema(
-                                    type=types.Type.NUMBER,
-                                    description="Volume from 0.0 to 1.0",
-                                ),
                                 "duration": types.Schema(
                                     type=types.Type.NUMBER,
-                                    description="Duration in seconds",
-                                ),
+                                    description="Duration of the noise in seconds.",
+                                )
                             },
                         ),
                     ),
                     types.FunctionDeclaration(
                         name="generate_pink_noise",
-                        description="Generate pink noise.",
+                        description="Generate continuous pink noise.",
                         parameters=types.Schema(
                             type=types.Type.OBJECT,
                             properties={
-                                "volume": types.Schema(
-                                    type=types.Type.NUMBER,
-                                    description="Volume from 0.0 to 1.0",
-                                ),
                                 "duration": types.Schema(
                                     type=types.Type.NUMBER,
-                                    description="Duration in seconds",
-                                ),
+                                    description="Duration of the noise in seconds.",
+                                )
                             },
                         ),
                     ),
@@ -161,6 +144,38 @@ class LLMManager:
                         name="stop_all_audio",
                         description="Stop all currently playing audio.",
                         parameters=types.Schema(type=types.Type.OBJECT),
+                    ),
+                    types.FunctionDeclaration(
+                        name="stop_audio",
+                        description="Stop a specific type of audio stream.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "audio_type": types.Schema(
+                                    type=types.Type.STRING,
+                                    description="The type of audio to stop (e.g., 'environmental', 'speakers', 'noise').",
+                                )
+                            },
+                            required=["audio_type"],
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="adjust_volume",
+                        description="Adjust the volume of a specific audio stream.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "audio_type": types.Schema(
+                                    type=types.Type.STRING,
+                                    description="The type of audio to adjust (e.g., 'environmental', 'speakers', 'noise').",
+                                ),
+                                "volume": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="The new volume from 0.0 to 1.0.",
+                                ),
+                            },
+                            required=["audio_type", "volume"],
+                        ),
                     ),
                     types.FunctionDeclaration(
                         name="get_status",
@@ -256,27 +271,22 @@ class LLMManager:
     def execute_function(self, function_call):
         """Executes a function call from the AI."""
         function_name = function_call.name
-        args = function_call.args
-        print(f"Executing function: {function_name} with args: {args}")
+        args = {key: value for key, value in function_call.args.items()}
+        print(f"--- EXECUTING TOOL: {function_name}({args}) ---")
+
         if function_name == "play_environmental_sound":
-            return self.audio_controller.play_environmental_sound(
-                volume=args.get("volume", 1.0)
-            )
+            return self.audio_controller.play_environmental_sound()
         elif function_name == "play_speaker_sound":
-            return self.audio_controller.play_speaker_sound(
-                volume=args.get("volume", 1.0)
-            )
+            return self.audio_controller.play_speaker_sound()
+        elif function_name == "play_noise_sound":
+            return self.audio_controller.play_noise_sound()
         elif function_name == "generate_white_noise":
-            return self.audio_controller.generate_noise(
-                "white",
-                duration=args.get("duration", 10),
-                volume=args.get("volume", 0.5),
+            return self.audio_controller.generate_white_noise(
+                duration=args.get("duration", 10)
             )
         elif function_name == "generate_pink_noise":
-            return self.audio_controller.generate_noise(
-                "pink",
-                duration=args.get("duration", 10),
-                volume=args.get("volume", 0.5),
+            return self.audio_controller.generate_pink_noise(
+                duration=args.get("duration", 10)
             )
         elif function_name == "generate_brown_noise":
             return self.audio_controller.generate_noise(
@@ -286,6 +296,12 @@ class LLMManager:
             )
         elif function_name == "stop_all_audio":
             return self.audio_controller.stop_all_audio()
+        elif function_name == "stop_audio":
+            return self.audio_controller.stop_audio(audio_type=args.get("audio_type"))
+        elif function_name == "adjust_volume":
+            return self.audio_controller.adjust_volume(
+                audio_type=args.get("audio_type"), volume=args.get("volume")
+            )
         elif function_name == "get_status":
             return self.audio_controller.get_status()
         elif function_name == "update_progress_file":
@@ -307,20 +323,29 @@ class LLMManager:
             async for response in turn:
                 if not self.running:
                     break
-                if hasattr(response, "text") and response.text:
-                    print(f"AI: {response.text}")
-                if hasattr(response, "data") and response.data:
-                    self.gemini_speaking = True
-                    self.out_queue.put_nowait(response.data)
-                if hasattr(response, "function_call") and response.function_call:
-                    result = self.execute_function(response.function_call)
-                    function_response_part = types.Part(
-                        function_response=types.FunctionResponse(
-                            name=response.function_call.name,
+
+                # The `tool_call` attribute contains the function calls from the model.
+                if response.tool_call and response.tool_call.function_calls:
+                    for function_call in response.tool_call.function_calls:
+                        result = self.execute_function(function_call)
+                        function_response = types.FunctionResponse(
+                            name=function_call.name,
                             response={"result": str(result)},
                         )
-                    )
-                    await self.session.send(input=function_response_part)
+                        await self.session.send(input=function_response)
+                    continue  # Tool calls handled, move to the next response.
+
+                # Handle audio data if present.
+                if response.server_content and response.server_content.model_turn:
+                    for part in response.server_content.model_turn.parts:
+                        if part.inline_data and part.inline_data.data:
+                            self.gemini_speaking = True
+                            audio_data = part.inline_data.data
+                            self.out_queue.put_nowait(audio_data)
+                            self.viz_queue.put_nowait(audio_data)
+                        if part.text:
+                            print(f"AI: {part.text}")
+
         self.gemini_speaking = False
 
     async def play_audio(self):
