@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 class StateManager:
-    def __init__(self, progress_file: str = "src/state/progress.md"):
+    def __init__(self, progress_file: str = "src/prompts/progress.md"):
         self.progress_file = Path(progress_file)
         self._ensure_progress_file_exists()
 

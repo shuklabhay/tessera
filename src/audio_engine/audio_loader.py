@@ -24,9 +24,7 @@ class AudioLoader:
 
     def _scan_files(self, category):
         path = AUDIO_DIRS[category]
-        print(f"Scanning audio directory: {path}")
         if not os.path.exists(path):
-            print(f"Warning: Audio directory {path} does not exist")
             return []
 
         files = [
@@ -34,9 +32,6 @@ class AudioLoader:
             for f in os.listdir(path)
             if f.lower().endswith((".wav", ".mp3", ".ogg"))
         ]
-        print(
-            f"Found {len(files)} audio files in {category}: {[os.path.basename(f) for f in files]}"
-        )
         return files
 
     def get_random_file(self, category):
@@ -75,10 +70,10 @@ class AudioLoader:
             audio = self.load_audio(f)
             if audio is not None:
                 normalized_audio = self._normalize_audio(audio)
-                loaded.append(normalized_audio)
+                # Store both the audio object and its original file path
+                loaded.append({"audio": normalized_audio, "filepath": f})
         with self.lock:
             self.cache[category] = loaded
-        print(f"Cached {len(loaded)} {category} audio files")
 
     def _background_cache(self):
         for category in AUDIO_DIRS:
@@ -90,11 +85,9 @@ class AudioLoader:
 
     def get_cached_audio(self, category):
         with self.lock:
-            print(f"Requesting cached audio for category: {category}")
-            print(f"Available cached files for {category}: {len(self.cache[category])}")
             if not self.cache[category]:
-                print(f"No cached audio available for {category}")
-                return None
-            selected = random.choice(self.cache[category])
-            print(f"Selected cached audio for {category} (duration: {len(selected)}ms)")
-            return selected
+                return None, None
+            selected_item = random.choice(self.cache[category])
+            audio = selected_item["audio"]
+            filepath = selected_item["filepath"]
+            return audio, filepath

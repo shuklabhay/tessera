@@ -1,4 +1,4 @@
-import time
+import os
 
 import numpy as np
 import pygame
@@ -23,10 +23,25 @@ class AudioController:
             "procedural_noise": 3,
         }
 
+    def _get_audio_description(self, filepath):
+        if not filepath:
+            return "No description available."
+
+        dir_name, file_name = os.path.split(filepath)
+        base_name, _ = os.path.splitext(file_name)
+        desc_path = os.path.join(dir_name, f"{base_name}.txt")
+
+        if os.path.exists(desc_path):
+            try:
+                with open(desc_path, "r") as f:
+                    return f.read().strip()
+            except Exception as e:
+                return "Error reading description."
+        return "No description available."
+
     def play_environmental_sound(self):
-        print("--- TOOL CALL: play_environmental_sound ---")
         volume = 0.7  # Hardcoded volume
-        audio = self.loader.get_cached_audio("environmental")
+        audio, filepath = self.loader.get_cached_audio("environmental")
         if audio:
             audio_array = np.array(audio.get_array_of_samples())
             if audio.channels == 2:
@@ -37,13 +52,13 @@ class AudioController:
             channel = self.channel_map["environmental"]
             self.mixer.play(sound, channel, loops=-1, volume=volume)
             self.active_streams["environmental"] = channel
-            return f"Playing environmental sound at {int(volume*100)}% volume"
+            description = self._get_audio_description(filepath)
+            return f"Playing environmental sound. Description: {description}"
         return "No environmental sounds available"
 
     def play_speaker_sound(self):
-        print("--- TOOL CALL: play_speaker_sound ---")
         volume = 0.7  # Hardcoded volume
-        audio = self.loader.get_cached_audio("speakers")
+        audio, filepath = self.loader.get_cached_audio("speakers")
         if audio:
             audio_array = np.array(audio.get_array_of_samples())
             if audio.channels == 2:
@@ -54,13 +69,13 @@ class AudioController:
             channel = self.channel_map["speakers"]
             self.mixer.play(sound, channel, loops=-1, volume=volume)
             self.active_streams["speakers"] = channel
-            return f"Playing speaker audio at {int(volume*100)}% volume"
+            description = self._get_audio_description(filepath)
+            return f"Playing speaker audio. Description: {description}"
         return "No speaker audio available"
 
     def play_noise_sound(self):
-        print("--- TOOL CALL: play_noise_sound ---")
         volume = 0.7  # Hardcoded volume
-        audio = self.loader.get_cached_audio("noise")
+        audio, filepath = self.loader.get_cached_audio("noise")
         if audio:
             audio_array = np.array(audio.get_array_of_samples())
             if audio.channels == 2:
@@ -71,11 +86,11 @@ class AudioController:
             channel = self.channel_map["noise"]
             self.mixer.play(sound, channel, loops=-1, volume=volume)
             self.active_streams["noise"] = channel
-            return f"Playing noise audio at {int(volume*100)}% volume"
+            description = self._get_audio_description(filepath)
+            return f"Playing noise audio. Description: {description}"
         return "No noise audio available"
 
     def generate_white_noise(self, duration=10):
-        print("--- TOOL CALL: generate_white_noise ---")
         volume = 0.7  # Hardcoded volume
         noise_data = self.noise_gen.white(duration, amplitude=volume)
         noise_data = (noise_data * 32767).astype(np.int16)
@@ -87,7 +102,6 @@ class AudioController:
         return f"Generating white noise at {int(volume*100)}% volume"
 
     def generate_pink_noise(self, duration=10):
-        print("--- TOOL CALL: generate_pink_noise ---")
         volume = 0.7  # Hardcoded volume
         noise_data = self.noise_gen.pink(duration, amplitude=volume)
         noise_data = (noise_data * 32767).astype(np.int16)
@@ -98,10 +112,15 @@ class AudioController:
         self.active_streams["pink_noise"] = channel
         return f"Generating pink noise at {int(volume*100)}% volume"
 
+    def pan_audio(self, audio_type, pan):
+        pan = max(-1.0, min(1.0, pan))  # Clamp pan value between -1.0 and 1.0
+        if audio_type in self.active_streams:
+            channel_idx = self.active_streams[audio_type]
+            self.mixer.set_pan(channel_idx, pan)
+            return f"Panned {audio_type} to {pan}"
+        return f"No active {audio_type} stream to pan."
+
     def adjust_volume(self, audio_type, volume):
-        print(
-            f"--- TOOL CALL: adjust_volume (type: {audio_type}, volume: {volume}) ---"
-        )
         volume = max(0.0, min(1.0, volume))
         if audio_type in self.active_streams:
             channel = self.active_streams[audio_type]
@@ -110,7 +129,6 @@ class AudioController:
         return f"No active {audio_type} stream to adjust"
 
     def stop_audio(self, audio_type=None):
-        print(f"--- TOOL CALL: stop_audio (type: {audio_type}) ---")
         if audio_type and audio_type in self.active_streams:
             channel = self.active_streams[audio_type]
             self.mixer.stop(channel)
@@ -123,14 +141,12 @@ class AudioController:
         return f"No active {audio_type} stream to stop"
 
     def get_status(self):
-        print("--- TOOL CALL: get_status ---")
         active = list(self.active_streams.keys())
         if active:
             return f"Currently playing: {', '.join(active)}"
         return "No background audio currently playing"
 
     def stop_all_audio(self):
-        print("--- TOOL CALL: stop_all_audio ---")
         stopped_streams = []
         for stream_name, channel in self.active_streams.items():
             self.mixer.stop(channel)

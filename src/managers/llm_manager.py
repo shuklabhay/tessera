@@ -183,6 +183,24 @@ class LLMManager:
                         parameters=types.Schema(type=types.Type.OBJECT),
                     ),
                     types.FunctionDeclaration(
+                        name="pan_audio",
+                        description="Pan a specific audio stream to the left or right.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "audio_type": types.Schema(
+                                    type=types.Type.STRING,
+                                    description="The type of audio to pan (e.g., 'environmental', 'speakers', 'noise').",
+                                ),
+                                "pan": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="The pan position from -1.0 (full left) to 1.0 (full right).",
+                                ),
+                            },
+                            required=["audio_type", "pan"],
+                        ),
+                    ),
+                    types.FunctionDeclaration(
                         name="update_progress_file",
                         description="Logs a new observation about the user's performance to their progress journal.",
                         parameters=types.Schema(
@@ -231,7 +249,6 @@ class LLMManager:
                 self.last_voice_detected = time_module.time()
                 if not self.recording:
                     self.recording = True
-                    print("Voice detected, starting to send audio.")
             if self.recording:
                 self.audio_in_queue.put_nowait(bytes(indata))
                 if (
@@ -239,7 +256,6 @@ class LLMManager:
                     > self.recording_duration
                 ):
                     self.recording = False
-                    print("Silence detected, stopping send.")
                     self.audio_in_queue.put_nowait(None)
 
         self.input_stream = sd.InputStream(
@@ -272,7 +288,6 @@ class LLMManager:
         """Executes a function call from the AI."""
         function_name = function_call.name
         args = {key: value for key, value in function_call.args.items()}
-        print(f"--- EXECUTING TOOL: {function_name}({args}) ---")
 
         if function_name == "play_environmental_sound":
             return self.audio_controller.play_environmental_sound()
@@ -304,49 +319,47 @@ class LLMManager:
             )
         elif function_name == "get_status":
             return self.audio_controller.get_status()
+        elif function_name == "pan_audio":
+            return self.audio_controller.pan_audio(
+                audio_type=args.get("audio_type"), pan=args.get("pan")
+            )
         elif function_name == "update_progress_file":
             return self.update_progress_file(args.get("new_observation"))
 
     async def _send_initial_prompt(self):
-        """Sends an initial message to kick off the conversation if necessary."""
-        if not self.state_manager.is_first_run():
-            print("Returning user. Sending initial prompt to elicit greeting.")
-            if self.session:
-                await self.session.send(
-                    input="I'm back and ready to continue.", end_of_turn=True
-                )
+        """Sends the system prompt to the AI when the session starts."""
+        if self.state_manager.is_first_session():
+            await self.session.send(input={"text": self.system_prompt})
+        else:
+            await self.session.send(input={"text": "Repeat the introductory greeting."})
 
     async def receive_and_process_responses(self):
-        """Receives and processes responses from Gemini."""
+        """Receives responses from the AI and processes them."""
         while self.running:
-            turn = self.session.receive()
-            async for response in turn:
-                if not self.running:
-                    break
+            response = await self.session.receive()
 
-                # The `tool_call` attribute contains the function calls from the model.
-                if response.tool_call and response.tool_call.function_calls:
-                    for function_call in response.tool_call.function_calls:
-                        result = self.execute_function(function_call)
-                        function_response = types.FunctionResponse(
-                            name=function_call.name,
-                            response={"result": str(result)},
-                        )
-                        await self.session.send(input=function_response)
-                    continue  # Tool calls handled, move to the next response.
+            if response.text:
+                self.user_input_text = ""
+                self.out_queue.put_nowait(response.text.encode("utf-8"))
 
-                # Handle audio data if present.
-                if response.server_content and response.server_content.model_turn:
-                    for part in response.server_content.model_turn.parts:
-                        if part.inline_data and part.inline_data.data:
-                            self.gemini_speaking = True
-                            audio_data = part.inline_data.data
-                            self.out_queue.put_nowait(audio_data)
-                            self.viz_queue.put_nowait(audio_data)
-                        if part.text:
-                            print(f"AI: {part.text}")
+            if response.function_calls:
+                for function_call in response.function_calls:
+                    result = self.execute_function(function_call)
+                    await self.session.send(
+                        input={
+                            "function_result": {
+                                "name": function_call.name,
+                                "response": result,
+                            }
+                        }
+                    )
 
-        self.gemini_speaking = False
+            if response.audio:
+                self.viz_queue.put_nowait(response.audio)
+                self.out_queue.put_nowait(response.audio)
+
+            if response.model_turn_result.end_of_turn:
+                self.gemini_speaking = False
 
     async def play_audio(self):
         """Plays audio from the output queue using sounddevice."""
@@ -371,7 +384,6 @@ class LLMManager:
                 model=MODEL, config=self.get_live_config()
             ) as session:
                 self.session = session
-                print("Live session connected.")
 
                 tasks = [
                     self.listen_audio(),
@@ -389,7 +401,6 @@ class LLMManager:
 
     def stop(self):
         """Stops all running processes cleanly."""
-        print("Stopping LLM Manager.")
         self.running = False
         if self.audio_controller:
             self.audio_controller.stop_all_audio()

@@ -27,6 +27,22 @@ class AudioMixer:
             if channel_idx < len(self.channels):
                 self.channels[channel_idx].set_volume(volume)
 
+    def set_pan(self, channel_idx, pan):
+        """
+        Sets the stereo panning for a channel.
+        """
+        with self.lock:
+            if channel_idx < len(self.channels):
+                channel = self.channels[channel_idx]
+                current_volume = channel.get_volume()
+
+                left_multiplier = (-(pan - 1) / 2) ** 0.5
+                right_multiplier = ((pan + 1) / 2) ** 0.5
+
+                channel.set_volume(
+                    current_volume * left_multiplier, current_volume * right_multiplier
+                )
+
     def is_playing(self, channel_idx):
         if channel_idx < len(self.channels):
             return self.channels[channel_idx].get_busy()

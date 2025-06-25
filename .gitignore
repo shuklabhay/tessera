@@ -177,3 +177,5 @@ src/planning
 /temp
 /testing
 .aider*
+src/prompts/progress.md
+/audio
