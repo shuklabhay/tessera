@@ -380,7 +380,6 @@ class LLMManager:
         """Main loop to run the manager."""
         self.running = True
         try:
-            # The 'async with' statement is crucial for proper session management
             async with client.aio.live.connect(
                 model=MODEL, config=self.get_live_config()
             ) as session:
