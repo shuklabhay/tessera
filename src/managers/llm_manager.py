@@ -328,15 +328,16 @@ class LLMManager:
 
     async def _send_initial_prompt(self):
         """Sends the system prompt to the AI when the session starts."""
-        if self.state_manager.is_first_session():
-            await self.session.send(input={"text": self.system_prompt})
+        if self.state_manager.is_first_run():
+            await self.session.send(input="I'm ready to start my session.")
         else:
-            await self.session.send(input={"text": "Repeat the introductory greeting."})
+            await self.session.send(input="Repeat the introductory greeting.")
 
     async def receive_and_process_responses(self):
         """Receives responses from the AI and processes them."""
-        while self.running:
-            response = await self.session.receive()
+        async for response in self.session.receive():
+            if not self.running:
+                break
 
             if response.text:
                 self.user_input_text = ""
