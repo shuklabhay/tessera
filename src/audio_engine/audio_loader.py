@@ -68,6 +68,13 @@ class AudioLoader:
             return None
         return self.load_audio(filepath)
 
+    def _normalize_audio(self, audio_segment, target_dbfs=-20.0):
+        """Normalizes the audio to a target dBFS."""
+        if audio_segment.dBFS == float("-inf"):
+            return audio_segment  # Avoid division by zero for silent audio
+        change_in_dbfs = target_dbfs - audio_segment.dBFS
+        return audio_segment.apply_gain(change_in_dbfs)
+
     def _cache_category(self, category):
         files = self._scan_files(category)
         loaded = []
@@ -75,7 +82,8 @@ class AudioLoader:
             try:
                 audio = self.load_audio(f)
                 if audio is not None:
-                    loaded.append(audio)
+                    normalized_audio = self._normalize_audio(audio)
+                    loaded.append(normalized_audio)
             except Exception as e:
                 print(f"Error loading {f}: {e}")
                 continue

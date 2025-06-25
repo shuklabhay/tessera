@@ -1,4 +1,3 @@
-from audio_visualizer import AudioVisualizer
 from kivy.animation import Animation
 from kivy.app import App
 from kivy.clock import Clock
@@ -7,6 +6,7 @@ from kivy.graphics import Color, Rectangle
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.label import Label
 
+from ui.audio_visualizer import AudioVisualizer
 from ui.orb import Orb
 
 # Set window to 9:16 aspect ratio, resizable
@@ -17,7 +17,7 @@ Window.resizable = True
 
 
 class MainLayout(FloatLayout):
-    def __init__(self, voice_chat=None, **kwargs):
+    def __init__(self, llm_manager=None, **kwargs):
         super(MainLayout, self).__init__(**kwargs)
         with self.canvas.before:
             Color(0, 0, 0, 1)  # Black
@@ -33,27 +33,31 @@ class MainLayout(FloatLayout):
         self.orb.base_radius = min(Window.width, Window.height) / 6
         self.add_widget(self.orb)
 
-        # Create mode selection labels
-        self.structured_button = self._create_mode_button(
-            "Structured Practice", {"center_x": 0.25, "center_y": 0.5}
-        )
-        self.freeform_button = self._create_mode_button(
-            "Freeform Training", {"center_x": 0.75, "center_y": 0.5}
-        )
-        self.add_widget(self.structured_button)
-        self.add_widget(self.freeform_button)
+        self.llm_manager = llm_manager
 
-        # Store reference to voice chat if provided
-        self.voice_chat = voice_chat
+        # Only show mode selection if the user has completed the diagnostic (is not on stage 0)
+        if (
+            self.llm_manager
+            and self.llm_manager.state_manager.get_current_stage_from_progress(
+                self.llm_manager.state_manager.get_progress()
+            )
+            > 0
+        ):
+            self.structured_button = self._create_mode_button(
+                "Structured Practice", {"center_x": 0.25, "center_y": 0.65}
+            )
+            self.freeform_button = self._create_mode_button(
+                "Freeform Training", {"center_x": 0.75, "center_y": 0.65}
+            )
+            self.add_widget(self.structured_button)
+            self.add_widget(self.freeform_button)
+            Clock.schedule_once(lambda dt: self.show_mode_selection(), 2)
 
         # Create audio visualizer for orb animation
         self.audio_visualizer = AudioVisualizer()
 
         # Schedule audio processing if voice chat is provided
         Clock.schedule_interval(self.update_orb_from_audio, 1 / 30)
-
-        # Initially, show the mode selection after a delay
-        Clock.schedule_once(lambda dt: self.show_mode_selection(), 2)
 
     def _create_mode_button(self, text, pos_hint):
         """Helper to create the mode selection labels."""
@@ -96,8 +100,9 @@ class MainLayout(FloatLayout):
         """Handle mode selection."""
         print(f"Mode selected: {mode_name}")
         self.hide_mode_selection()
-        # Here, you would typically notify the voice_chat or another controller
-        # For example: self.voice_chat.set_mode(mode_name)
+        # Notify the LLM manager of the user's choice
+        if self.llm_manager:
+            self.llm_manager.set_user_mode(mode_name)
 
     def _update_bg(self, instance, value):
         """Update the background rectangle when the window size changes"""
@@ -113,22 +118,22 @@ class MainLayout(FloatLayout):
         """
         Update the orb visualization based on the latest audio data
         """
-        if not self.voice_chat:
+        if not self.llm_manager:
             return
 
         # If user is speaking, orb is idle
         if (
-            hasattr(self.voice_chat, "gemini_speaking")
-            and self.voice_chat.gemini_speaking
+            hasattr(self.llm_manager, "gemini_speaking")
+            and self.llm_manager.gemini_speaking
         ):
             # Get the last audio chunk from voice_chat if available
             last_audio = None
 
             if (
-                hasattr(self.voice_chat, "last_gemini_audio")
-                and self.voice_chat.last_gemini_audio is not None
+                hasattr(self.llm_manager, "last_gemini_audio")
+                and self.llm_manager.last_gemini_audio is not None
             ):
-                last_audio = self.voice_chat.last_gemini_audio
+                last_audio = self.llm_manager.last_gemini_audio
 
             # Process the audio data to get amplitude
             if last_audio is not None:
@@ -141,11 +146,11 @@ class MainLayout(FloatLayout):
 
 
 class UnlockHearingApp(App):
-    def __init__(self, voice_chat=None, **kwargs):
+    def __init__(self, llm_manager=None, **kwargs):
+        self.llm_manager = llm_manager
         super(UnlockHearingApp, self).__init__(**kwargs)
-        self.voice_chat = voice_chat
         self.title = "Unlock Hearing"
 
     def build(self):
         """Build and return the main layout"""
-        return MainLayout(voice_chat=self.voice_chat)
+        return MainLayout(llm_manager=self.llm_manager)

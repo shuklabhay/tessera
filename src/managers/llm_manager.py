@@ -1,20 +1,20 @@
 import asyncio
 import os
+import re
 import ssl
 import time as time_module
 import traceback
+from datetime import datetime
 
 import certifi
 import numpy as np
 import sounddevice as sd
-from coaching_engine import CoachingEngine
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
 from audio_engine.audio_controller import AudioController
-from session.session_manager import SessionManager
-from stages.stage_manager import StageManager
+from managers.state_manager import StateManager
 
 ssl._create_default_https_context = ssl._create_stdlib_context
 os.environ["SSL_CERT_FILE"] = certifi.where()
@@ -44,7 +44,7 @@ def load_system_prompt():
         return None
 
 
-class VoiceChat:
+class LLMManager:
     def __init__(self):
         self.audio_in_queue = None
         self.out_queue = None
@@ -58,12 +58,63 @@ class VoiceChat:
         self.recording = False
         self.last_voice_detected = 0
         self.recording_duration = 1.5
-        self.system_prompt = load_system_prompt()
+        self.state_manager = StateManager()
+        self.system_prompt = self._get_contextual_system_prompt()
         self.current_audio_amplitude = 0
-        self.session_manager = SessionManager()
-        self.stage_manager = StageManager()
-        self.coaching_engine = CoachingEngine(self.session_manager, self.stage_manager)
         self.audio_controller = AudioController()
+
+    def _get_contextual_system_prompt(self):
+        """
+        Gets the base system prompt and prepends the user's current context.
+        """
+        base_prompt = load_system_prompt()
+        context_summary = self.state_manager.get_context_summary()
+        if context_summary:
+            return f"{context_summary}\n\n{base_prompt}"
+        return base_prompt
+
+    def update_progress_log(self, summary: str) -> str:
+        """
+        Updates the user's progress log with a new summary and advances them to the next stage.
+        """
+        try:
+            # Get current state
+            progress_content = self.state_manager.get_progress()
+            current_stage = self.state_manager.get_current_stage_from_progress(
+                progress_content
+            )
+            new_stage = current_stage + 1
+            today_date = datetime.now().strftime("%Y-%m-%d")
+
+            # Update Last Session Date
+            progress_content = re.sub(
+                r"(- \*\*Last Session Date\*\*: ).*",
+                rf"\1{today_date}",
+                progress_content,
+            )
+
+            # Update Current Stage
+            progress_content = re.sub(
+                r"(- \*\*Current Stage\*\*: ).*",
+                rf"\1{new_stage}",
+                progress_content,
+            )
+
+            # Append the new summary under AI Observations
+            new_observation = f"- {today_date}: {summary}"
+            progress_content = re.sub(
+                r"(## AI Observations\n)",
+                rf"\1\n{new_observation}",
+                progress_content,
+            )
+
+            # Save the updated progress
+            self.state_manager.save_progress(progress_content)
+
+            return f"Progress successfully logged. User is now at stage {new_stage}."
+        except Exception as e:
+            print(f"Error updating progress log: {e}")
+            return "An error occurred while trying to log progress."
 
     def get_tools(self):
         return [
@@ -251,7 +302,6 @@ class VoiceChat:
 
             print(f"[EXECUTING SYNC] Function: {function_name} with args: {args}")
 
-            # Map function calls to actual methods
             if function_name == "play_environmental_sound":
                 volume = args.get("volume", 0.7)
                 return self.audio_controller.play_environmental_sound(volume)
@@ -277,13 +327,42 @@ class VoiceChat:
             elif function_name == "update_progress_log":
                 summary = args.get("summary")
                 if summary:
-                    return self.coaching_engine.update_progress_log(summary)
+                    return self.update_progress_log(summary)
                 return "Error: Summary not provided for progress log."
             else:
                 return f"Unknown function: {function_name}"
         except Exception as e:
             print(f"Error executing function {function_call.name}: {e}")
             return f"Error: {e}"
+
+    async def _send_initial_prompt(self):
+        """Sends an initial prompt to the AI based on the user's progress."""
+        current_stage = self.state_manager.get_current_stage_from_progress(
+            self.state_manager.get_progress()
+        )
+        initial_prompt = ""
+        if current_stage == 0:
+            initial_prompt = (
+                "The user is new. Greet them warmly and begin the diagnostic test."
+            )
+        else:
+            initial_prompt = "The user is returning. Greet them and ask if they want to begin their next stage of structured practice or do some freeform training."
+
+        if initial_prompt:
+            await self.session.send(input=initial_prompt)
+            print(f"[SENT] Initial prompt to AI: {initial_prompt}")
+
+    async def set_user_mode(self, mode_name: str):
+        """Handles the user's mode selection from the UI."""
+        prompt = ""
+        if mode_name == "structured":
+            prompt = "The user has selected 'Structured Practice'. Please begin the next stage for them."
+        elif mode_name == "freeform":
+            prompt = "The user has selected 'Freeform Training'. Please ask them what they would like to focus on."
+
+        if prompt and self.session:
+            await self.session.send(input=prompt)
+            print(f"[SENT] User mode selection to AI: {prompt}")
 
     async def receive_audio(self):
         while self.running:
@@ -304,42 +383,20 @@ class VoiceChat:
                             if part.text:
                                 print(f"Narrator: {part.text}")
 
-                            # Check for function calls in the Live API response
                             if hasattr(part, "function_call") and part.function_call:
-                                print(
-                                    f"[FUNCTION CALL] Found function call: {part.function_call.name}"
-                                )
-                                print(
-                                    f"[FUNCTION CALL] Arguments: {part.function_call.args}"
-                                )
-
-                                # Execute the function call
                                 await self.execute_function_call(part.function_call)
 
-                            # Also check for executable code or other function call formats
                             elif (
                                 hasattr(part, "executable_code")
                                 and part.executable_code
                             ):
-                                print(
-                                    f"[EXECUTABLE CODE] Found: {part.executable_code}"
-                                )
-                                # Try to execute audio functions if they're called in code
                                 await self.handle_executable_code(part.executable_code)
 
-                            # Check if there are function calls in a different structure
                             elif hasattr(part, "functionCall") and part.functionCall:
-                                print(
-                                    f"[FUNCTION CALL] Found camelCase function call: {part.functionCall.name}"
-                                )
                                 await self.execute_function_call(part.functionCall)
 
-                # Check if the entire response has function calls
                 if hasattr(response, "function_calls") and response.function_calls:
                     for function_call in response.function_calls:
-                        print(
-                            f"[FUNCTION CALL] Response-level function call: {function_call.name}"
-                        )
                         await self.execute_function_call(function_call)
 
             if self.gemini_speaking:
@@ -350,7 +407,6 @@ class VoiceChat:
         args = function_call.args if hasattr(function_call, "args") else {}
         print(f"[EXECUTING ASYNC] Function: {function_call.name} with args: {args}")
         try:
-            # All tools are currently synchronous, so we run them in a thread
             result = await asyncio.to_thread(self.execute_function, function_call)
             await self.send_function_response(function_call.name, result)
         except Exception as e:
@@ -360,7 +416,6 @@ class VoiceChat:
     async def send_function_response(self, function_name, result):
         """Sends the result of a function call back to the model."""
         try:
-            # For Live API, we need to send the function response using the correct format
             function_response = types.Content(
                 parts=[
                     types.Part(
@@ -372,15 +427,9 @@ class VoiceChat:
                 ],
                 role="user",
             )
-
-            # Send the function response back to the session
             await self.session.send(input=function_response)
-            print(f"[SENT] Function response back to model: {result}")
-
         except Exception as e:
             print(f"[ERROR] Failed to send function response: {e}")
-            import traceback
-
             traceback.print_exc()
 
     async def play_audio(self):
@@ -413,6 +462,9 @@ class VoiceChat:
                 self.audio_in_queue = asyncio.Queue()
                 self.out_queue = asyncio.Queue(maxsize=100)
 
+                # Send initial prompt to AI based on user's state
+                await self._send_initial_prompt()
+
                 listen_task = asyncio.create_task(self.listen_audio())
                 sender_task = asyncio.create_task(self.send_realtime())
                 receiver_task = asyncio.create_task(self.receive_audio())
@@ -433,51 +485,20 @@ class VoiceChat:
                 if hasattr(executable_code, "code")
                 else str(executable_code)
             )
-            print(f"[CODE] Attempting to handle: {code}")
-
-            # Check if the code is trying to call our audio functions
             if "generate_white_noise" in code:
-                print("[CODE EXECUTION] Executing white noise generation")
-                result = self.audio_controller.generate_white_noise(0.3, 10)
-                print(f"[CODE RESULT] {result}")
+                self.audio_controller.generate_white_noise(0.3, 10)
             elif "generate_pink_noise" in code:
-                print("[CODE EXECUTION] Executing pink noise generation")
-                result = self.audio_controller.generate_pink_noise(0.3, 10)
-                print(f"[CODE RESULT] {result}")
+                self.audio_controller.generate_pink_noise(0.3, 10)
             elif "generate_brown_noise" in code:
-                print("[CODE EXECUTION] Executing brown noise generation")
-                result = self.audio_controller.generate_brown_noise(0.3, 10)
-                print(f"[CODE RESULT] {result}")
+                self.audio_controller.generate_brown_noise(0.3, 10)
             elif "play_environmental_sound" in code:
-                print("[CODE EXECUTION] Playing environmental sound")
-                result = self.audio_controller.play_environmental_sound(0.7)
-                print(f"[CODE RESULT] {result}")
+                self.audio_controller.play_environmental_sound(0.7)
             elif "play_speaker_sound" in code:
-                print("[CODE EXECUTION] Playing speaker sound")
-                result = self.audio_controller.play_speaker_sound(0.7)
-                print(f"[CODE RESULT] {result}")
+                self.audio_controller.play_speaker_sound(0.7)
             elif "get_status" in code:
-                print("[CODE EXECUTION] Getting audio status")
-                result = self.audio_controller.get_status()
-                print(f"[CODE RESULT] {result}")
+                self.audio_controller.get_status()
             elif "stop_all_audio" in code:
-                print("[CODE EXECUTION] Stopping all audio")
-                result = self.audio_controller.stop_all_audio()
-                print(f"[CODE RESULT] {result}")
-            else:
-                print(f"[CODE] Unhandled code: {code}")
-
+                self.audio_controller.stop_all_audio()
         except Exception as e:
             print(f"[ERROR] Code execution failed: {e}")
-            import traceback
-
             traceback.print_exc()
-
-
-def main():
-    chat = VoiceChat()
-    asyncio.run(chat.run())
-
-
-if __name__ == "__main__":
-    main()
