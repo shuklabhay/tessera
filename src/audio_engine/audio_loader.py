@@ -28,19 +28,16 @@ class AudioLoader:
         if not os.path.exists(path):
             print(f"Warning: Audio directory {path} does not exist")
             return []
-        try:
-            files = [
-                os.path.join(path, f)
-                for f in os.listdir(path)
-                if f.lower().endswith((".wav", ".mp3", ".ogg"))
-            ]
-            print(
-                f"Found {len(files)} audio files in {category}: {[os.path.basename(f) for f in files]}"
-            )
-            return files
-        except Exception as e:
-            print(f"Error scanning {path}: {e}")
-            return []
+
+        files = [
+            os.path.join(path, f)
+            for f in os.listdir(path)
+            if f.lower().endswith((".wav", ".mp3", ".ogg"))
+        ]
+        print(
+            f"Found {len(files)} audio files in {category}: {[os.path.basename(f) for f in files]}"
+        )
+        return files
 
     def get_random_file(self, category):
         files = self._scan_files(category)
@@ -49,18 +46,14 @@ class AudioLoader:
         return random.choice(files)
 
     def load_audio(self, filepath):
-        try:
-            if filepath.lower().endswith(".wav"):
-                return AudioSegment.from_wav(filepath)
-            elif filepath.lower().endswith(".mp3"):
-                return AudioSegment.from_mp3(filepath)
-            elif filepath.lower().endswith(".ogg"):
-                return AudioSegment.from_ogg(filepath)
-            else:
-                return AudioSegment.from_file(filepath)
-        except Exception as e:
-            print(f"Error loading audio file {filepath}: {e}")
-            return None
+        if filepath.lower().endswith(".wav"):
+            return AudioSegment.from_wav(filepath)
+        elif filepath.lower().endswith(".mp3"):
+            return AudioSegment.from_mp3(filepath)
+        elif filepath.lower().endswith(".ogg"):
+            return AudioSegment.from_ogg(filepath)
+        else:
+            return AudioSegment.from_file(filepath)
 
     def get_random_audio(self, category):
         filepath = self.get_random_file(category)
@@ -79,14 +72,10 @@ class AudioLoader:
         files = self._scan_files(category)
         loaded = []
         for f in files:
-            try:
-                audio = self.load_audio(f)
-                if audio is not None:
-                    normalized_audio = self._normalize_audio(audio)
-                    loaded.append(normalized_audio)
-            except Exception as e:
-                print(f"Error loading {f}: {e}")
-                continue
+            audio = self.load_audio(f)
+            if audio is not None:
+                normalized_audio = self._normalize_audio(audio)
+                loaded.append(normalized_audio)
         with self.lock:
             self.cache[category] = loaded
         print(f"Cached {len(loaded)} {category} audio files")
