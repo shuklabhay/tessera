@@ -12,12 +12,14 @@ class AudioMixer:
         self.lock = Lock()
 
     def play(self, sound, channel_idx, loops=0, volume=1.0):
+        """Play sound on specified channel."""
         with self.lock:
             ch = self.channels[channel_idx]
             ch.set_volume(volume)
             ch.play(sound, loops=loops)
 
     def queue_sound(self, channel_idx, sound):
+        """Queue sound on channel or play immediately if channel is free."""
         with self.lock:
             ch = self.channels[channel_idx]
             if not ch.get_busy():
@@ -26,37 +28,41 @@ class AudioMixer:
                 ch.queue(sound)
 
     def stop(self, channel_idx):
+        """Stop playback on specified channel."""
         with self.lock:
             if channel_idx < len(self.channels):
                 self.channels[channel_idx].stop()
 
     def set_volume(self, channel_idx, volume):
+        """Set volume for specified channel."""
         with self.lock:
             if channel_idx < len(self.channels):
                 self.channels[channel_idx].set_volume(volume)
 
     def set_pan(self, channel_idx, pan):
-        """
-        Sets the stereo panning for a channel.
-        """
+        """Set stereo panning for specified channel."""
         with self.lock:
             if channel_idx < len(self.channels):
                 channel = self.channels[channel_idx]
                 current_volume = channel.get_volume()
 
+                # Calculate left/right multipliers
                 left_multiplier = (-(pan - 1) / 2) ** 0.5
                 right_multiplier = ((pan + 1) / 2) ** 0.5
 
+                # Apply panning
                 channel.set_volume(
                     current_volume * left_multiplier, current_volume * right_multiplier
                 )
 
     def is_playing(self, channel_idx):
+        """Check if specified channel is currently playing."""
         if channel_idx < len(self.channels):
             return self.channels[channel_idx].get_busy()
         return False
 
     def stop_all(self):
+        """Stop playback on all channels."""
         with self.lock:
             for ch in self.channels:
                 ch.stop()

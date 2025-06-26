@@ -22,73 +22,66 @@ class Orb(Widget):
             self.orb_color_instr = Color(*self.orb_color)
             self.orb = Ellipse(pos=(0, 0), size=(0, 0))
 
-        # Schedule the drawing update
-        Clock.schedule_interval(self.update_graphics, 1 / 60)  # 60 FPS
-
-        # Initialize animation properties
+        Clock.schedule_interval(self.update_graphics, 1 / 60)
         self.anim = None
 
         self.idle_anim = None
         self.start_idle_animation()
 
     def update_graphics(self, dt):
-        """Update the orb's position and size"""
-
+        """Update orb position and size for current frame."""
         # Calculate sizes based on radius and multiplier
         orb_size = self.base_radius * 2 * self.size_multiplier
         glow_size = self.glow_radius * 2 * self.size_multiplier
 
-        # Calculate positions to center the orb
+        # Calculate centered positions
         orb_pos = (self.center_x - orb_size / 2, self.center_y - orb_size / 2)
         glow_pos = (self.center_x - glow_size / 2, self.center_y - glow_size / 2)
 
-        # Update the ellipses
+        # Update ellipse graphics
         self.orb.pos = orb_pos
         self.orb.size = (orb_size, orb_size)
         self.glow.pos = glow_pos
         self.glow.size = (glow_size, glow_size)
 
     def update_from_amplitude(self, amplitude):
-        """
-        Update the orb based on audio amplitude
-        """
+        """Update orb size based on audio amplitude."""
         # Cancel any existing animation
         if self.anim is not None:
             self.anim.cancel(self)
 
-        # Calculate new size based on amplitude (with limits)
+        # Calculate target size with limits
         target_size = 1.0 + min(0.5, amplitude * 0.7)
 
-        # Create and start the animation
+        # Create and start animation
         self.anim = Animation(
             size_multiplier=target_size,
-            duration=0.05,  # Fast response to audio
+            duration=0.05,
             transition="out_quad",
         )
-
         self.anim.start(self)
 
-        # Reset the idle animation timer when there's activity
-        if amplitude > 0.05:  # If there's significant audio
-            self.start_idle_animation(delay=1.5)  # Restart idle after 1.5s of silence
+        # Reset idle timer if significant audio detected
+        if amplitude > 0.05:
+            self.start_idle_animation(delay=1.5)
 
     def start_idle_animation(self, delay=0):
-        """Start the subtle pulsing idle animation"""
+        """Start subtle pulsing idle animation after delay."""
         # Cancel any existing idle animation
         if self.idle_anim is not None:
             self.idle_anim.cancel(self)
 
-        # Schedule the idle animation to start after delay
+        # Schedule idle animation to start
         Clock.schedule_once(self._begin_idle_animation, delay)
 
     def _begin_idle_animation(self, dt):
-        """The actual idle animation setup"""
-        # Subtle breathing effect
+        """Set up and start the breathing idle animation."""
+        # Breathing effect parameters
         idle_size_min = 0.97
         idle_size_max = 1.03
         idle_duration = 2.0
 
-        # Create a repeating animation that goes between the two sizes
+        # Create repeating breathing animation
         self.idle_anim = Animation(
             size_multiplier=idle_size_max,
             duration=idle_duration / 2,
@@ -98,31 +91,23 @@ class Orb(Widget):
             duration=idle_duration / 2,
             transition="in_out_sine",
         )
-
         self.idle_anim.repeat = True
-
-        # Start the animation
         self.idle_anim.start(self)
 
     def on_touch_down(self, touch):
-        """Handle touch events"""
+        """Handle touch events with pulse animation."""
         if self.collide_point(*touch.pos):
-
-            # Simple pulse effect on touch
+            # Cancel all animations
             Animation.cancel_all(self)
 
-            # Quick pulse outward
+            # Create pulse effect: expand then contract
             anim1 = Animation(size_multiplier=1.2, duration=0.15, transition="out_quad")
-
-            # And back
             anim2 = Animation(
                 size_multiplier=1.0, duration=0.3, transition="in_out_quad"
             )
-
-            # Chain the animations and start
             (anim1 + anim2).start(self)
 
-            # After animation completes, restart idle
+            # Restart idle animation after pulse completes
             Clock.schedule_once(lambda dt: self.start_idle_animation(), 0.5)
 
             return True

@@ -2,9 +2,9 @@ import os
 import random
 from threading import Lock, Thread
 
-from pydub import AudioSegment
+import numpy as np
+import soundfile as sf
 
-# Get the project root directory (two levels up from this file)
 PROJECT_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
@@ -20,10 +20,11 @@ class AudioLoader:
     def __init__(self):
         self.cache = {k: [] for k in AUDIO_DIRS}
         self.lock = Lock()
-        self.paths = AUDIO_DIRS  # Add paths attribute for _scan_files
+        self.paths = AUDIO_DIRS
         self._start_background_cache()
 
     def _scan_files(self, category):
+        """Scan directory for audio files in the given category."""
         path = self.paths.get(category)
         if not path:
             print(f"Warning: No path configured for category '{category}'")
@@ -34,6 +35,7 @@ class AudioLoader:
             return []
 
         try:
+            # Find supported audio files
             files = [
                 os.path.join(path, f)
                 for f in os.listdir(path)
@@ -48,28 +50,56 @@ class AudioLoader:
             return []
 
     def get_random_file(self, category):
+        """Get a random audio file path from the specified category."""
         files = self._scan_files(category)
         if not files:
             return None
         return random.choice(files)
 
     def load_audio(self, filepath):
+        """Load and process audio file to 24kHz stereo format."""
         try:
-            if filepath.lower().endswith(".wav"):
-                audio = AudioSegment.from_wav(filepath)
-            elif filepath.lower().endswith(".mp3"):
-                audio = AudioSegment.from_mp3(filepath)
-            elif filepath.lower().endswith(".ogg"):
-                audio = AudioSegment.from_ogg(filepath)
-            else:
-                audio = AudioSegment.from_file(filepath)
+            # Load audio data
+            data, sample_rate = sf.read(filepath, dtype="float32")
 
-            return audio.set_frame_rate(24000).set_channels(2)
+            # Convert to stereo
+            if len(data.shape) == 1:
+                data = np.column_stack([data, data])
+            elif data.shape[1] > 2:
+                data = data[:, :2]
+
+            # Resample to 24kHz if needed
+            if sample_rate != 24000:
+                target_length = int(len(data) * 24000 / sample_rate)
+                if len(data.shape) == 2:
+                    # Resample each channel separately
+                    resampled_left = np.interp(
+                        np.linspace(0, len(data) - 1, target_length),
+                        np.arange(len(data)),
+                        data[:, 0],
+                    )
+                    resampled_right = np.interp(
+                        np.linspace(0, len(data) - 1, target_length),
+                        np.arange(len(data)),
+                        data[:, 1],
+                    )
+                    data = np.column_stack([resampled_left, resampled_right])
+                else:
+                    # Resample mono and duplicate to stereo
+                    resampled = np.interp(
+                        np.linspace(0, len(data) - 1, target_length),
+                        np.arange(len(data)),
+                        data,
+                    )
+                    data = np.column_stack([resampled, resampled])
+
+            return data
         except Exception as e:
             print(f"Error loading audio file {filepath}: {e}")
             return None
 
     def get_random_audio(self, category):
+        """Get a random loaded audio file and its path from the specified category."""
         filepath = self.get_random_file(category)
         if not filepath:
             return None, None
@@ -77,36 +107,50 @@ class AudioLoader:
         return audio, filepath
 
     def get_cached_audio(self, category):
+        """Get a random audio file from cache, or load directly if cache is empty."""
+        # Try to get from cache first
         with self.lock:
             if category in self.cache and self.cache[category]:
-                # Correctly unpack the cached dictionary
                 cached_item = random.choice(self.cache[category])
                 return cached_item["audio"], cached_item["filepath"]
-        # Fallback if cache is empty
+
+        # Fallback to direct loading
         print(f"Cache miss for category {category}, loading directly.")
         audio, filepath = self.get_random_audio(category)
         return audio, filepath
 
     def _normalize_audio(self, audio):
-        return audio.normalize()
+        """Normalize audio to [-1, 1] range."""
+        if audio is None:
+            return None
+        max_val = np.max(np.abs(audio))
+        if max_val > 0:
+            return audio / max_val
+        return audio
 
     def _cache_category(self, category):
+        """Load and cache all audio files for a category."""
         files = self._scan_files(category)
         loaded = []
+
+        # Load and normalize each file
         for f in files:
             audio = self.load_audio(f)
             if audio is not None:
                 normalized_audio = self._normalize_audio(audio)
-                # Store both the audio object and its original file path
                 loaded.append({"audio": normalized_audio, "filepath": f})
+
+        # Update cache
         with self.lock:
             self.cache[category] = loaded
         print(f"Cached {len(loaded)} {category} audio files")
 
     def _background_cache(self):
+        """Cache all audio categories in background."""
         for category in AUDIO_DIRS:
             self._cache_category(category)
 
     def _start_background_cache(self):
+        """Start background thread to cache audio files."""
         t = Thread(target=self._background_cache, daemon=True)
         t.start()
