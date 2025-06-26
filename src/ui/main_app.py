@@ -59,15 +59,11 @@ class MainLayout(FloatLayout):
             self.orb.start_idle_animation(delay=0.5)
             return
 
-        try:
-            # Process Gemini's output audio for visualization
-            if self.llm_manager.viz_queue:
-                audio_chunk = self.llm_manager.viz_queue.pop(0)
-                amplitude = self.audio_visualizer.process_audio(audio_chunk)
-                self.orb.update_from_amplitude(amplitude * 2.5)
-        except Exception:
-            # Return to idle if no audio available
-            self.orb.start_idle_animation(delay=0.5)
+        # Process Gemini's output audio for visualization
+        if self.llm_manager.viz_queue:
+            audio_chunk = self.llm_manager.viz_queue.pop(0)
+            amplitude = self.audio_visualizer.process_audio(audio_chunk)
+            self.orb.update_from_amplitude(amplitude * 2.5)
 
 
 class UnlockHearingApp(App):

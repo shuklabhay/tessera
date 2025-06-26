@@ -29,18 +29,15 @@ class AudioController:
         if not audio_chunk_bytes:
             return
 
-        try:
-            # Convert bytes to numpy array
-            mono_array = np.frombuffer(audio_chunk_bytes, dtype=np.int16)
+        # Convert bytes to numpy array
+        mono_array = np.frombuffer(audio_chunk_bytes, dtype=np.int16)
 
-            # Convert mono to stereo
-            stereo_array = np.column_stack([mono_array, mono_array])
+        # Convert mono to stereo
+        stereo_array = np.column_stack([mono_array, mono_array])
 
-            # Create and queue sound
-            sound_chunk = pygame.sndarray.make_sound(stereo_array)
-            self.mixer.queue_sound(self.channel_map["gemini"], sound_chunk)
-        except Exception as e:
-            print(f"Error playing Gemini chunk: {e}")
+        # Create and queue sound
+        sound_chunk = pygame.sndarray.make_sound(stereo_array)
+        self.mixer.queue_sound(self.channel_map["gemini"], sound_chunk)
 
     def _get_audio_description(self, filepath):
         """Get description from companion .txt file if it exists."""
@@ -54,11 +51,8 @@ class AudioController:
 
         # Try to read description
         if os.path.exists(desc_path):
-            try:
-                with open(desc_path, "r") as f:
-                    return f.read().strip()
-            except Exception as e:
-                return "Error reading description."
+            with open(desc_path, "r") as f:
+                return f.read().strip()
         return "No description available."
 
     def play_environmental_sound(self, volume=0.7):
