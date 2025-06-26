@@ -112,6 +112,27 @@ class AudioController:
         self.active_streams["pink_noise"] = channel
         return f"Generating pink noise at {int(volume*100)}% volume"
 
+    def generate_noise(self, noise_type, duration=10, volume=0.5):
+        """Generate different types of noise based on the noise_type parameter."""
+        if noise_type == "brown":
+            return self.generate_brown_noise(duration, volume)
+        elif noise_type == "white":
+            return self.generate_white_noise(duration)
+        elif noise_type == "pink":
+            return self.generate_pink_noise(duration)
+        else:
+            return f"Unknown noise type: {noise_type}"
+
+    def generate_brown_noise(self, duration=10, volume=0.5):
+        noise_data = self.noise_gen.brown(duration, amplitude=volume)
+        noise_data = (noise_data * 32767).astype(np.int16)
+        noise_stereo = np.column_stack((noise_data, noise_data))
+        sound = pygame.sndarray.make_sound(noise_stereo)
+        channel = self.channel_map["procedural_noise"]
+        self.mixer.play(sound, channel, loops=-1, volume=1.0)
+        self.active_streams["brown_noise"] = channel
+        return f"Generating brown noise at {int(volume*100)}% volume"
+
     def pan_audio(self, audio_type, pan):
         pan = max(-1.0, min(1.0, pan))  # Clamp pan value between -1.0 and 1.0
         if audio_type in self.active_streams:
