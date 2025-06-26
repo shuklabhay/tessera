@@ -1,5 +1,4 @@
 import asyncio
-import os
 import threading
 
 from managers.llm_manager import LLMManager
