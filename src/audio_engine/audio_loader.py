@@ -20,6 +20,7 @@ class AudioLoader:
     def __init__(self):
         self.cache = {k: [] for k in AUDIO_DIRS}
         self.lock = Lock()
+        self.paths = AUDIO_DIRS  # Add paths attribute for _scan_files
         self._start_background_cache()
 
     def _scan_files(self, category):
@@ -55,13 +56,15 @@ class AudioLoader:
     def load_audio(self, filepath):
         try:
             if filepath.lower().endswith(".wav"):
-                return AudioSegment.from_wav(filepath)
+                audio = AudioSegment.from_wav(filepath)
             elif filepath.lower().endswith(".mp3"):
-                return AudioSegment.from_mp3(filepath)
+                audio = AudioSegment.from_mp3(filepath)
             elif filepath.lower().endswith(".ogg"):
-                return AudioSegment.from_ogg(filepath)
+                audio = AudioSegment.from_ogg(filepath)
             else:
-                return AudioSegment.from_file(filepath)
+                audio = AudioSegment.from_file(filepath)
+
+            return audio.set_frame_rate(24000).set_channels(2)
         except Exception as e:
             print(f"Error loading audio file {filepath}: {e}")
             return None
@@ -76,29 +79,16 @@ class AudioLoader:
     def get_cached_audio(self, category):
         with self.lock:
             if category in self.cache and self.cache[category]:
-                return random.choice(self.cache[category]), None
+                # Correctly unpack the cached dictionary
+                cached_item = random.choice(self.cache[category])
+                return cached_item["audio"], cached_item["filepath"]
+        # Fallback if cache is empty
+        print(f"Cache miss for category {category}, loading directly.")
         audio, filepath = self.get_random_audio(category)
         return audio, filepath
 
     def _normalize_audio(self, audio):
         return audio.normalize()
-
-    def preload_category(self, category):
-        print(f"Preloading {category} audio files...")
-        files = self._scan_files(category)
-        loaded = []
-        for f in files:
-            try:
-                audio = self.load_audio(f)
-                if audio is not None:
-                    normalized_audio = self._normalize_audio(audio)
-                    loaded.append(normalized_audio)
-            except Exception as e:
-                print(f"Error loading {f}: {e}")
-                continue
-        with self.lock:
-            self.cache[category] = loaded
-        print(f"Cached {len(loaded)} {category} audio files")
 
     def _cache_category(self, category):
         files = self._scan_files(category)
@@ -111,6 +101,7 @@ class AudioLoader:
                 loaded.append({"audio": normalized_audio, "filepath": f})
         with self.lock:
             self.cache[category] = loaded
+        print(f"Cached {len(loaded)} {category} audio files")
 
     def _background_cache(self):
         for category in AUDIO_DIRS:

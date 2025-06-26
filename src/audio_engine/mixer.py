@@ -17,6 +17,14 @@ class AudioMixer:
             ch.set_volume(volume)
             ch.play(sound, loops=loops)
 
+    def queue_sound(self, channel_idx, sound):
+        with self.lock:
+            ch = self.channels[channel_idx]
+            if not ch.get_busy():
+                ch.play(sound)
+            else:
+                ch.queue(sound)
+
     def stop(self, channel_idx):
         with self.lock:
             if channel_idx < len(self.channels):

@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import os
 import ssl
 import time as time_module
@@ -51,10 +50,8 @@ class LLMManager:
         self.viz_queue = None
         self.session = None
         self.input_stream = None
-        self.output_stream = None
         self.running = True
         self.gemini_speaking = False
-        self.last_gemini_audio = None
         self.speech_threshold = 300
         self.recording = False
         self.last_voice_detected = 0
@@ -63,8 +60,6 @@ class LLMManager:
         self.system_prompt = self._get_contextual_system_prompt()
         self.current_audio_amplitude = 0
         self.audio_controller = AudioController()
-
-        # VAD parameters
         self.audio_buffer = []
         self.buffer_size = 10
         self.voice_confidence = 0.0
@@ -80,9 +75,9 @@ class LLMManager:
             return f"{context_summary}\n\n{base_prompt}"
         return base_prompt
 
-    def update_progress_log(self, summary: str) -> str:
+    def update_progress_file(self, new_observation: str) -> str:
         try:
-            self.state_manager.update_progress(summary)
+            self.state_manager.update_progress(new_observation)
             return "Progress successfully logged."
         except Exception as e:
             print(f"Error updating progress log: {e}")
@@ -108,6 +103,19 @@ class LLMManager:
                     types.FunctionDeclaration(
                         name="play_speaker_sound",
                         description="Play a random audio clip of a person speaking.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "volume": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="Volume from 0.0 to 1.0",
+                                )
+                            },
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="play_noise_sound",
+                        description="Play a random pre-recorded noise sound (e.g., crowd chatter).",
                         parameters=types.Schema(
                             type=types.Type.OBJECT,
                             properties={
@@ -170,6 +178,56 @@ class LLMManager:
                         ),
                     ),
                     types.FunctionDeclaration(
+                        name="adjust_volume",
+                        description="Adjust the volume of a specific audio type.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "audio_type": types.Schema(
+                                    type=types.Type.STRING,
+                                    description="The type of audio to adjust (e.g., 'environmental', 'speakers', 'noise', 'white_noise').",
+                                ),
+                                "volume": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="The new volume from 0.0 to 1.0.",
+                                ),
+                            },
+                            required=["audio_type", "volume"],
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="pan_audio",
+                        description="Pan an audio source to the left or right.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "audio_type": types.Schema(
+                                    type=types.Type.STRING,
+                                    description="The type of audio to pan.",
+                                ),
+                                "pan": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="The pan position, from -1.0 (left) to 1.0 (right).",
+                                ),
+                            },
+                            required=["audio_type", "pan"],
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="stop_audio",
+                        description="Stop a specific type of audio.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "audio_type": types.Schema(
+                                    type=types.Type.STRING,
+                                    description="The type of audio to stop.",
+                                )
+                            },
+                            required=["audio_type"],
+                        ),
+                    ),
+                    types.FunctionDeclaration(
                         name="stop_all_audio",
                         description="Stop all currently playing audio.",
                         parameters=types.Schema(type=types.Type.OBJECT),
@@ -180,17 +238,17 @@ class LLMManager:
                         parameters=types.Schema(type=types.Type.OBJECT),
                     ),
                     types.FunctionDeclaration(
-                        name="update_progress_log",
+                        name="update_progress_file",
                         description="Logs a new observation about the user's performance to their progress journal.",
                         parameters=types.Schema(
                             type=types.Type.OBJECT,
                             properties={
-                                "summary": types.Schema(
+                                "new_observation": types.Schema(
                                     type=types.Type.STRING,
-                                    description="A concise summary of the AI's observation.",
+                                    description="A concise summary of the AI's observation, including stage progression and user performance.",
                                 )
                             },
-                            required=["summary"],
+                            required=["new_observation"],
                         ),
                     ),
                 ]
@@ -301,6 +359,9 @@ class LLMManager:
         elif function_name == "play_speaker_sound":
             volume = args.get("volume", 0.7)
             return self.audio_controller.play_speaker_sound(volume)
+        elif function_name == "play_noise_sound":
+            volume = args.get("volume", 0.7)
+            return self.audio_controller.play_noise_sound(volume)
         elif function_name == "generate_white_noise":
             volume = args.get("volume", 0.3)
             duration = args.get("duration", 10)
@@ -313,15 +374,25 @@ class LLMManager:
             volume = args.get("volume", 0.3)
             duration = args.get("duration", 10)
             return self.audio_controller.generate_brown_noise(volume, duration)
+        elif function_name == "adjust_volume":
+            return self.audio_controller.adjust_volume(
+                args.get("audio_type"), args.get("volume")
+            )
+        elif function_name == "pan_audio":
+            return self.audio_controller.pan_audio(
+                args.get("audio_type"), args.get("pan")
+            )
+        elif function_name == "stop_audio":
+            return self.audio_controller.stop_audio(args.get("audio_type"))
         elif function_name == "stop_all_audio":
             return self.audio_controller.stop_all_audio()
         elif function_name == "get_status":
             return self.audio_controller.get_status()
-        elif function_name == "update_progress_log":
-            summary = args.get("summary")
-            if summary:
-                return self.update_progress_log(summary)
-            return "Error: Summary not provided for progress log."
+        elif function_name == "update_progress_file":
+            new_observation = args.get("new_observation")
+            if new_observation:
+                return self.update_progress_file(new_observation)
+            return "Error: new_observation not provided for progress log."
         else:
             return f"Unknown function: {function_name}"
 
@@ -413,6 +484,7 @@ class LLMManager:
                                             if hasattr(part.inline_data, "data"):
                                                 audio_data = part.inline_data.data
                                                 self.out_queue.put_nowait(audio_data)
+                                                self.viz_queue.put_nowait(audio_data)
                                                 if not self.gemini_speaking:
                                                     print(
                                                         "🤖 GEMINI SPEAKING - Audio started"
@@ -428,6 +500,7 @@ class LLMManager:
 
                     if hasattr(response, "audio") and response.audio:
                         self.out_queue.put_nowait(response.audio)
+                        self.viz_queue.put_nowait(response.audio)
                         if not self.gemini_speaking:
                             print("🤖 GEMINI SPEAKING - Audio started")
                         self.gemini_speaking = True
@@ -444,51 +517,25 @@ class LLMManager:
                 await asyncio.sleep(1)
 
     async def play_audio(self):
-        self.output_stream = sd.OutputStream(
-            samplerate=RECEIVE_SAMPLE_RATE,
-            channels=CHANNELS,
-            dtype=np.int16,
-            blocksize=CHUNK_SIZE,
-        )
-        self.output_stream.start()
-
         while self.running:
             try:
-                audio_chunk = await self.out_queue.get()
-                self.last_gemini_audio = audio_chunk
+                audio_chunk_bytes = await self.out_queue.get()
 
-                if isinstance(audio_chunk, bytes):
-                    audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
-                elif isinstance(audio_chunk, str):
-                    try:
-                        decoded_audio = base64.b64decode(audio_chunk)
-                        audio_data = np.frombuffer(decoded_audio, dtype=np.int16)
-                    except Exception as e:
-                        print(f"Failed to decode base64 audio: {e}")
-                        continue
-                else:
-                    if hasattr(audio_chunk, "data"):
-                        audio_data = np.frombuffer(audio_chunk.data, dtype=np.int16)
-                    else:
-                        audio_data = np.array(audio_chunk, dtype=np.int16)
+                if audio_chunk_bytes:
+                    self.audio_controller.play_gemini_chunk(audio_chunk_bytes)
 
-                if len(audio_data) > 0:
-                    if CHANNELS == 1:
-                        audio_data = audio_data.reshape(-1, 1)
-                    self.output_stream.write(audio_data)
                     if not self.gemini_speaking:
-                        print("🤖 GEMINI SPEAKING - Playing audio")
+                        print("🤖 GEMINI SPEAKING - Audio started")
                     self.gemini_speaking = True
                     self.last_gemini_audio_time = time_module.time()
 
                 self.out_queue.task_done()
+            except asyncio.CancelledError:
+                break
             except Exception as e:
                 print(f"Error in play_audio: {e}")
                 traceback.print_exc()
                 continue
-
-        self.output_stream.stop()
-        self.output_stream.close()
 
     async def run(self):
         self.running = True
