@@ -1,6 +1,7 @@
 import asyncio
 import os
 import ssl
+import threading
 import time as time_module
 import traceback
 
@@ -39,34 +40,29 @@ def load_system_prompt():
         with open(prompt_path, "r") as file:
             return file.read()
     except Exception as e:
-        print(f"Warning: Failed to load system prompt: {e}")
+        print(f"Warning: Failed to load system prompt: {e}", flush=True)
         return None
 
 
 class LLMManager:
     def __init__(self):
-        self.audio_in_queue = None
-        self.out_queue = None
-        self.viz_queue = None
+        self.audio_in_queue = asyncio.Queue()
+        self.out_queue = asyncio.Queue()
+        self.viz_queue = []
         self.session = None
         self.input_stream = None
-        self.running = True
+        self.output_stream = None
+        self.running = False
         self.gemini_speaking = False
-        self.speech_threshold = 300
+        self.speech_threshold = 200
         self.recording = False
         self.last_voice_detected = 0
-        self.recording_duration = 1.5
+        self.recording_duration = 1.0
         self.state_manager = StateManager()
         self.system_prompt = self._get_contextual_system_prompt()
-        self.current_audio_amplitude = 0
         self.audio_controller = AudioController()
-        self.audio_buffer = []
-        self.buffer_size = 10
-        self.voice_confidence = 0.0
-        self.voice_threshold = 0.6
-        self.min_voice_duration = 0.3
-        self.last_gemini_audio_time = 0
-        self.gemini_timeout = 2.0
+        self.loop = None
+        self.thread = None
 
     def _get_contextual_system_prompt(self):
         base_prompt = load_system_prompt()
@@ -80,7 +76,7 @@ class LLMManager:
             self.state_manager.update_progress(new_observation)
             return "Progress successfully logged."
         except Exception as e:
-            print(f"Error updating progress log: {e}")
+            print(f"Error updating progress log: {e}", flush=True)
             return "An error occurred while trying to log progress."
 
     def get_tools(self):
@@ -115,7 +111,7 @@ class LLMManager:
                     ),
                     types.FunctionDeclaration(
                         name="play_noise_sound",
-                        description="Play a random pre-recorded noise sound (e.g., crowd chatter).",
+                        description="Play a random pre-recorded noise sound.",
                         parameters=types.Schema(
                             type=types.Type.OBJECT,
                             properties={
@@ -185,7 +181,7 @@ class LLMManager:
                             properties={
                                 "audio_type": types.Schema(
                                     type=types.Type.STRING,
-                                    description="The type of audio to adjust (e.g., 'environmental', 'speakers', 'noise', 'white_noise').",
+                                    description="The type of audio to adjust.",
                                 ),
                                 "volume": types.Schema(
                                     type=types.Type.NUMBER,
@@ -207,7 +203,7 @@ class LLMManager:
                                 ),
                                 "pan": types.Schema(
                                     type=types.Type.NUMBER,
-                                    description="The pan position, from -1.0 (left) to 1.0 (right).",
+                                    description="Pan value from -1.0 (left) to 1.0 (right).",
                                 ),
                             },
                             required=["audio_type", "pan"],
@@ -215,7 +211,7 @@ class LLMManager:
                     ),
                     types.FunctionDeclaration(
                         name="stop_audio",
-                        description="Stop a specific type of audio.",
+                        description="Stop a specific type of audio stream.",
                         parameters=types.Schema(
                             type=types.Type.OBJECT,
                             properties={
@@ -224,7 +220,6 @@ class LLMManager:
                                     description="The type of audio to stop.",
                                 )
                             },
-                            required=["audio_type"],
                         ),
                     ),
                     types.FunctionDeclaration(
@@ -239,13 +234,13 @@ class LLMManager:
                     ),
                     types.FunctionDeclaration(
                         name="update_progress_file",
-                        description="Logs a new observation about the user's performance to their progress journal.",
+                        description="Logs a new observation about the user's performance.",
                         parameters=types.Schema(
                             type=types.Type.OBJECT,
                             properties={
                                 "new_observation": types.Schema(
                                     type=types.Type.STRING,
-                                    description="A concise summary of the AI's observation, including stage progression and user performance.",
+                                    description="A concise summary of the observation.",
                                 )
                             },
                             required=["new_observation"],
@@ -255,81 +250,66 @@ class LLMManager:
             )
         ]
 
+    def get_live_config(self):
+        return types.LiveConnectConfig(
+            response_modalities=["AUDIO"],
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                        voice_name="Algenib"
+                    )
+                )
+            ),
+            realtime_input_config=types.RealtimeInputConfig(
+                turn_coverage="TURN_INCLUDES_ALL_INPUT"
+            ),
+            tools=self.get_tools(),
+            system_instruction=self.system_prompt,
+        )
+
+    def audio_callback(self, indata, frames, time, status):
+        if not self.running:
+            return
+
+        amplitude = np.linalg.norm(indata)
+
+        if amplitude > self.speech_threshold:
+            self.last_voice_detected = time_module.time()
+            if not self.recording:
+                self.recording = True
+                print("🎤 Voice detected, starting to record!", flush=True)
+
+        if self.recording:
+            try:
+                self.audio_in_queue.put_nowait(bytes(indata))
+            except:
+                pass  # Queue might be full
+
+            silence_duration = time_module.time() - self.last_voice_detected
+            if silence_duration > self.recording_duration:
+                self.recording = False
+                print(
+                    f"🔇 Silence detected ({silence_duration:.1f}s), stopping recording.",
+                    flush=True,
+                )
+                try:
+                    self.audio_in_queue.put_nowait(None)  # End of turn marker
+                except:
+                    pass
+
     async def listen_audio(self):
         self.recording = False
         self.last_voice_detected = time_module.time()
 
-        def audio_callback(indata, frames, time, status):
-            if not self.running:
-                return
-
-            if self.gemini_speaking:
-                if (
-                    time_module.time() - self.last_gemini_audio_time
-                    > self.gemini_timeout
-                ):
-                    print("🔇 GEMINI STOPPED - Timeout, resuming input")
-                    self.gemini_speaking = False
-                else:
-                    return
-
-            amplitude = np.linalg.norm(indata)
-            self.current_audio_amplitude = amplitude
-
-            self.audio_buffer.append(amplitude)
-            if len(self.audio_buffer) > self.buffer_size:
-                self.audio_buffer.pop(0)
-
-            if len(self.audio_buffer) >= 3:
-                smoothed_amplitude = np.mean(self.audio_buffer)
-                amplitude_variance = np.var(self.audio_buffer)
-
-                amplitude_score = min(1.0, smoothed_amplitude / self.speech_threshold)
-                variance_score = min(1.0, amplitude_variance / 100.0)
-                self.voice_confidence = 0.7 * amplitude_score + 0.3 * variance_score
-
-                if self.voice_confidence > self.voice_threshold:
-                    current_time = time_module.time()
-                    self.last_voice_detected = current_time
-
-                    if not self.recording:
-                        if hasattr(self, "voice_start_time"):
-                            if (
-                                current_time - self.voice_start_time
-                                >= self.min_voice_duration
-                            ):
-                                self.recording = True
-                                print(
-                                    f"🎤 USER SPEAKING - Started recording (confidence: {self.voice_confidence:.2f})"
-                                )
-                        else:
-                            self.voice_start_time = current_time
-                    else:
-                        self.voice_start_time = current_time
-                else:
-                    if hasattr(self, "voice_start_time"):
-                        delattr(self, "voice_start_time")
-
-            if self.recording:
-                self.audio_in_queue.put_nowait(bytes(indata))
-                silence_duration = time_module.time() - self.last_voice_detected
-                if silence_duration > self.recording_duration:
-                    self.recording = False
-                    print(
-                        f"🔇 USER STOPPED - Stopped recording after {silence_duration:.1f}s of silence"
-                    )
-                    self.audio_in_queue.put_nowait(None)
-                    if hasattr(self, "voice_start_time"):
-                        delattr(self, "voice_start_time")
-
         self.input_stream = sd.InputStream(
             samplerate=SEND_SAMPLE_RATE,
             channels=CHANNELS,
-            callback=audio_callback,
+            callback=self.audio_callback,
             blocksize=CHUNK_SIZE,
             dtype=np.int16,
         )
         self.input_stream.start()
+        print("🎙️ Audio input started", flush=True)
 
         while self.running:
             await asyncio.sleep(0.1)
@@ -337,21 +317,23 @@ class LLMManager:
         self.input_stream.stop()
         self.input_stream.close()
 
-    async def send_realtime(self):
+    async def send_audio(self):
         while self.running:
-            audio_chunk = await self.audio_in_queue.get()
-            if self.session and audio_chunk is not None:
-                await self.session.send(
-                    input={"data": audio_chunk, "mime_type": "audio/pcm"}
-                )
-            elif self.session and audio_chunk is None:
-                await self.session.send(end_of_turn=True)
+            try:
+                audio_chunk = await self.audio_in_queue.get()
+                if self.session and audio_chunk is not None:
+                    turn = {"data": audio_chunk, "mime_type": "audio/pcm"}
+                    await self.session.send(input=turn)
+                elif self.session and audio_chunk is None:
+                    await self.session.send(end_of_turn=True)
+            except Exception as e:
+                print(f"❌ Error sending audio: {e}", flush=True)
 
     def execute_function(self, function_call):
         function_name = function_call.name
         args = function_call.args if hasattr(function_call, "args") else {}
 
-        print(f"[EXECUTING] Function: {function_name} with args: {args}")
+        print(f"🔧 Executing function: {function_name} with args: {args}", flush=True)
 
         if function_name == "play_environmental_sound":
             volume = args.get("volume", 0.7)
@@ -396,42 +378,7 @@ class LLMManager:
         else:
             return f"Unknown function: {function_name}"
 
-    async def execute_function_call(self, function_call):
-        try:
-            result = await asyncio.to_thread(self.execute_function, function_call)
-            await self.send_function_response(function_call.name, result)
-        except Exception as e:
-            print(f"Error executing function {function_call.name}: {e}")
-            traceback.print_exc()
-
-    async def send_function_response(self, function_name, result):
-        try:
-            function_response = types.Content(
-                parts=[
-                    types.Part(
-                        function_response=types.FunctionResponse(
-                            name=function_name, response={"result": result}
-                        )
-                    )
-                ],
-                role="user",
-            )
-            await self.session.send(input=function_response)
-        except Exception as e:
-            print(f"[ERROR] Failed to send function response: {e}")
-            traceback.print_exc()
-
-    async def _send_initial_prompt(self):
-        if self.state_manager.is_first_run():
-            initial_prompt = "I'm ready to start my first session."
-        else:
-            initial_prompt = "I'm ready to continue my training."
-
-        if initial_prompt:
-            await self.session.send(input=initial_prompt, end_of_turn=True)
-            print(f"[SENT] Initial prompt to AI: {initial_prompt}")
-
-    async def receive_audio(self):
+    async def receive_and_process_responses(self):
         while self.running:
             try:
                 turn = self.session.receive()
@@ -439,146 +386,114 @@ class LLMManager:
                     if not self.running:
                         break
 
-                    if hasattr(response, "server_content") and response.server_content:
-                        content = response.server_content
+                    if response.tool_call and response.tool_call.function_calls:
+                        for function_call in response.tool_call.function_calls:
+                            result = self.execute_function(function_call)
+                            function_response = types.FunctionResponse(
+                                name=function_call.name,
+                                response={"result": str(result)},
+                            )
+                            await self.session.send(input=function_response)
+                        continue
 
-                        if hasattr(content, "model_turn") and content.model_turn:
-                            for part in content.model_turn.parts:
-                                if hasattr(part, "text") and part.text:
-                                    print(f"Narrator: {part.text}")
-
-                                if (
-                                    hasattr(part, "function_call")
-                                    and part.function_call
-                                ):
-                                    await self.execute_function_call(part.function_call)
-
-                        if hasattr(content, "turn_complete") and content.turn_complete:
-                            if self.gemini_speaking:
-                                print("🔇 GEMINI STOPPED - Turn complete")
-                            self.gemini_speaking = False
-
-                    if hasattr(response, "candidates") and response.candidates:
-                        for candidate in response.candidates:
-                            if hasattr(candidate, "content") and candidate.content:
-                                if (
-                                    hasattr(candidate.content, "parts")
-                                    and candidate.content.parts
-                                ):
-                                    for part in candidate.content.parts:
-                                        if hasattr(part, "text") and part.text:
-                                            print(f"Narrator: {part.text}")
-
-                                        if (
-                                            hasattr(part, "function_call")
-                                            and part.function_call
-                                        ):
-                                            await self.execute_function_call(
-                                                part.function_call
-                                            )
-
-                                        if (
-                                            hasattr(part, "inline_data")
-                                            and part.inline_data
-                                        ):
-                                            if hasattr(part.inline_data, "data"):
-                                                audio_data = part.inline_data.data
-                                                self.out_queue.put_nowait(audio_data)
-                                                self.viz_queue.put_nowait(audio_data)
-                                                if not self.gemini_speaking:
-                                                    print(
-                                                        "🤖 GEMINI SPEAKING - Audio started"
-                                                    )
-                                                self.gemini_speaking = True
-                                                self.last_gemini_audio_time = (
-                                                    time_module.time()
-                                                )
-
-                    if hasattr(response, "function_calls") and response.function_calls:
-                        for function_call in response.function_calls:
-                            await self.execute_function_call(function_call)
-
-                    if hasattr(response, "audio") and response.audio:
-                        self.out_queue.put_nowait(response.audio)
-                        self.viz_queue.put_nowait(response.audio)
-                        if not self.gemini_speaking:
-                            print("🤖 GEMINI SPEAKING - Audio started")
-                        self.gemini_speaking = True
-                        self.last_gemini_audio_time = time_module.time()
-
-                    if hasattr(response, "end_of_turn") and response.end_of_turn:
-                        if self.gemini_speaking:
-                            print("🔇 GEMINI STOPPED - End of turn")
-                        self.gemini_speaking = False
+                    if response.server_content and response.server_content.model_turn:
+                        for part in response.server_content.model_turn.parts:
+                            if part.inline_data and part.inline_data.data:
+                                print("🤖 Gemini speaking...", flush=True)
+                                self.gemini_speaking = True
+                                audio_data = part.inline_data.data
+                                self.out_queue.put_nowait(audio_data)
+                                self.viz_queue.append(audio_data)
+                            if part.text:
+                                print(f"💬 AI: {part.text}", flush=True)
 
             except Exception as e:
-                print(f"Error in receive_audio: {e}")
-                traceback.print_exc()
-                await asyncio.sleep(1)
+                if "no response available" not in str(e).lower():
+                    print(f"❌ Error processing responses: {e}", flush=True)
+                await asyncio.sleep(0.1)
 
     async def play_audio(self):
+        self.output_stream = sd.OutputStream(
+            samplerate=RECEIVE_SAMPLE_RATE, channels=CHANNELS, dtype=np.int16
+        )
+        self.output_stream.start()
+        print("🔊 Audio output started", flush=True)
+
         while self.running:
             try:
-                audio_chunk_bytes = await self.out_queue.get()
-
-                if audio_chunk_bytes:
-                    self.audio_controller.play_gemini_chunk(audio_chunk_bytes)
-
-                    if not self.gemini_speaking:
-                        print("🤖 GEMINI SPEAKING - Audio started")
-                    self.gemini_speaking = True
-                    self.last_gemini_audio_time = time_module.time()
-
+                audio_chunk = await self.out_queue.get()
+                if audio_chunk:
+                    audio_array = np.frombuffer(audio_chunk, dtype=np.int16)
+                    self.output_stream.write(audio_array)
                 self.out_queue.task_done()
-            except asyncio.CancelledError:
-                break
             except Exception as e:
-                print(f"Error in play_audio: {e}")
-                traceback.print_exc()
-                continue
+                print(f"❌ Error playing audio: {e}", flush=True)
 
-    async def run(self):
+        self.output_stream.stop()
+        self.output_stream.close()
+
+    async def _send_initial_prompt(self):
+        if not self.state_manager.is_first_run():
+            print("👋 Sending greeting for returning user", flush=True)
+            await self.session.send(
+                input="I'm back and ready to continue.", end_of_turn=True
+            )
+
+    async def run_async(self):
         self.running = True
         try:
             async with client.aio.live.connect(
-                model=MODEL,
-                config=types.LiveConnectConfig(
-                    response_modalities=["AUDIO"],
-                    speech_config=types.SpeechConfig(
-                        voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                voice_name="Algenib"
-                            )
-                        )
-                    ),
-                    tools=self.get_tools(),
-                    system_instruction=self.system_prompt,
-                ),
+                model=MODEL, config=self.get_live_config()
             ) as session:
                 self.session = session
-
-                self.audio_in_queue = asyncio.Queue()
-                self.out_queue = asyncio.Queue(maxsize=100)
-                self.viz_queue = asyncio.Queue()
+                print("✅ Connected to Gemini Live!", flush=True)
 
                 await self._send_initial_prompt()
 
-                listen_task = asyncio.create_task(self.listen_audio())
-                sender_task = asyncio.create_task(self.send_realtime())
-                receiver_task = asyncio.create_task(self.receive_audio())
-                player_task = asyncio.create_task(self.play_audio())
+                tasks = [
+                    self.listen_audio(),
+                    self.send_audio(),
+                    self.receive_and_process_responses(),
+                    self.play_audio(),
+                ]
 
-                await asyncio.gather(
-                    listen_task, sender_task, receiver_task, player_task
-                )
-
+                await asyncio.gather(*tasks)
         except Exception as e:
-            print(f"Error in run: {e}")
+            print(f"❌ Error in async run: {e}", flush=True)
             traceback.print_exc()
         finally:
             self.stop()
 
+    def run_in_thread(self):
+        """Run the async event loop in a separate thread"""
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_until_complete(self.run_async())
+
+    def start(self):
+        print("🚀 Starting LLM Manager...", flush=True)
+        self.running = True
+
+        # Start the async code in a separate thread
+        self.thread = threading.Thread(target=self.run_in_thread, daemon=True)
+        self.thread.start()
+
+        print("✅ LLM Manager started successfully!", flush=True)
+        return True
+
     def stop(self):
+        print("🛑 Stopping LLM Manager...", flush=True)
         self.running = False
+
+        if self.input_stream:
+            self.input_stream.stop()
+            self.input_stream.close()
+
+        if self.output_stream:
+            self.output_stream.stop()
+            self.output_stream.close()
+
         if self.audio_controller:
             self.audio_controller.stop_all_audio()
+
+        print("✅ LLM Manager stopped", flush=True)

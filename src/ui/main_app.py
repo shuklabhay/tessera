@@ -32,6 +32,10 @@ class MainLayout(FloatLayout):
         self.audio_visualizer = AudioVisualizer()
         Clock.schedule_interval(self.update_orb_from_audio, 1 / 30)
 
+        # Start LLM manager when layout is ready
+        if self.llm_manager:
+            Clock.schedule_once(self.start_llm_manager, 1)
+
     def _update_bg(self, instance, value):
         """Update background and orb size when window resizes."""
         # Update background rectangle
@@ -43,16 +47,24 @@ class MainLayout(FloatLayout):
             self.orb.base_radius = min(Window.width, Window.height) / 6
             self.orb.glow_radius = self.orb.base_radius * 1.1
 
+    def start_llm_manager(self, dt):
+        """Start the LLM manager on the main thread."""
+        if self.llm_manager:
+            print("🎬 Starting LLM Manager from UI...", flush=True)
+            self.llm_manager.start()
+
     def update_orb_from_audio(self, dt):
         """Update orb visualization based on latest audio data."""
-        if not self.llm_manager:
+        if not self.llm_manager or not self.llm_manager.viz_queue:
+            self.orb.start_idle_animation(delay=0.5)
             return
 
         try:
             # Process Gemini's output audio for visualization
-            audio_chunk = self.llm_manager.viz_queue.get_nowait()
-            amplitude = self.audio_visualizer.process_audio(audio_chunk)
-            self.orb.update_from_amplitude(amplitude * 2.5)
+            if self.llm_manager.viz_queue:
+                audio_chunk = self.llm_manager.viz_queue.pop(0)
+                amplitude = self.audio_visualizer.process_audio(audio_chunk)
+                self.orb.update_from_amplitude(amplitude * 2.5)
         except Exception:
             # Return to idle if no audio available
             self.orb.start_idle_animation(delay=0.5)
@@ -67,3 +79,10 @@ class UnlockHearingApp(App):
     def build(self):
         """Build and return the main layout."""
         return MainLayout(llm_manager=self.llm_manager)
+
+    def on_stop(self):
+        """Clean up when app closes."""
+        if self.llm_manager:
+            print("🛑 App closing, stopping LLM Manager...", flush=True)
+            self.llm_manager.stop()
+        return True
