@@ -428,7 +428,12 @@ class LLMManager:
             self.turn_ended.clear()
 
     async def _send_initial_prompt(self):
-        if not self.state_manager.is_first_run():
+        if self.state_manager.is_first_run():
+            # For first-time users, trigger immediate introduction
+            await self.session.send(
+                input="Initialize introduction phase for new user.", end_of_turn=True
+            )
+        else:
             await self.session.send(
                 input="I'm back and ready to continue.", end_of_turn=True
             )

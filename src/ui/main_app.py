@@ -63,7 +63,7 @@ class MainLayout(FloatLayout):
         if self.llm_manager.viz_queue:
             audio_chunk = self.llm_manager.viz_queue.pop(0)
             amplitude = self.audio_visualizer.process_audio(audio_chunk)
-            self.orb.update_from_amplitude(amplitude * 2.5)
+            self.orb.update_from_amplitude(amplitude * 1.5)
 
 
 class UnlockHearingApp(App):
