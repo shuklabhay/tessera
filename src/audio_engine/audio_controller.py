@@ -59,8 +59,8 @@ class AudioController:
         """Play a random environmental soundscape on loop."""
         audio, filepath = self.loader.get_cached_audio("environmental")
         if audio is not None:
-            # Convert to int16 for pygame
-            audio_array = (audio * 32767).astype(np.int16)
+            # Convert for pygame
+            audio_array = np.ascontiguousarray((audio * 32767).astype(np.int16))
             sound = pygame.sndarray.make_sound(audio_array)
 
             # Play on environmental channel
@@ -77,8 +77,8 @@ class AudioController:
         """Play a random person speaking audio on loop."""
         audio, filepath = self.loader.get_cached_audio("speakers")
         if audio is not None:
-            # Convert to int16 for pygame
-            audio_array = (audio * 32767).astype(np.int16)
+            # Convert to int16 for pygame and ensure contiguous memory
+            audio_array = np.ascontiguousarray((audio * 32767).astype(np.int16))
             sound = pygame.sndarray.make_sound(audio_array)
 
             # Play on speakers channel
@@ -95,8 +95,8 @@ class AudioController:
         """Play a random noise sound on loop."""
         audio, filepath = self.loader.get_cached_audio("noise")
         if audio is not None:
-            # Convert to int16 for pygame
-            audio_array = (audio * 32767).astype(np.int16)
+            # Convert to int16 for pygame and ensure contiguous memory
+            audio_array = np.ascontiguousarray((audio * 32767).astype(np.int16))
             sound = pygame.sndarray.make_sound(audio_array)
 
             # Play on noise channel

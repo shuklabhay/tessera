@@ -329,6 +329,9 @@ class LLMManager:
         function_name = function_call.name
         args = function_call.args if hasattr(function_call, "args") else {}
 
+        # Debug print for all tool invocations
+        print(f"[TOOL DEBUG] {function_name} called with args: {args}", flush=True)
+
         if function_name == "play_environmental_sound":
             volume = args.get("volume", 0.7)
             return self.audio_controller.play_environmental_sound(volume)
