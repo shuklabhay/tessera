@@ -1,55 +1,100 @@
 import datetime
+import json
 from pathlib import Path
 
 
 class StateManager:
-    def __init__(self, progress_file: str = "src/prompts/progress.md"):
-        self.progress_file = Path(progress_file)
+    def __init__(self, progress_file: str = "src/prompts/progress.json"):
+        root = Path(__file__).resolve().parents[2]  # project root
+        self.progress_file = (root / progress_file).resolve()
         self._ensure_progress_file_exists()
 
     def _ensure_progress_file_exists(self):
-        """Create progress file with default template if it doesn't exist."""
         if not self.progress_file.exists():
             self.progress_file.parent.mkdir(parents=True, exist_ok=True)
-            self.progress_file.touch()
-            self.reset_progress()
+            self._write_state({"name": None, "pronunciation": None, "sessions": []})
+
+    def _read_state(self) -> dict:
+        """Return persisted state, falling back to an empty schema if file is missing or malformed."""
+        try:
+            with self.progress_file.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            # Reset to a blank structure on corruption/missing file
+            default_state = {"name": None, "pronunciation": None, "sessions": []}
+            self._write_state(default_state)
+            return default_state
+
+    def _write_state(self, state: dict):
+        with self.progress_file.open("w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2)
 
     def is_first_run(self) -> bool:
-        """Check if this is the user's first session."""
-        content = self.get_progress().strip()
-        return not content or "No sessions yet." in content
-
-    def get_progress(self) -> str:
-        """Read the entire content of the progress file."""
-        return self.progress_file.read_text()
+        state = self._read_state()
+        return state.get("sessions") == []
 
     def update_progress(self, new_observation: str):
-        """Append a new observation to the progress file."""
-        current_content = self.get_progress()
-        date_str = datetime.datetime.now().strftime("%Y-%m-%d")
-        entry = f"- {date_str}: {new_observation}\n"
+        """Append an observation to the latest session (create session if needed)."""
+        state = self._read_state()
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
 
-        # Handle first entry vs subsequent entries
-        if "No sessions yet." in current_content:
-            new_content = f"# User Progress Journal\n\n## AI Observations\n{entry}"
-        else:
-            new_content = current_content + entry
+        if not state["sessions"] or state["sessions"][-1]["date"] != today:
+            state["sessions"].append({"date": today, "observations": []})
 
-        self.progress_file.write_text(new_content)
+        # Name capture heuristics
+        lower_obs = new_observation.lower()
+        name_candidate = None
 
-    def reset_progress(self):
-        """Reset the progress file to its initial state."""
-        initial_content = """# User Progress Journal
+        if lower_obs.startswith("user name captured:"):
+            # Expected pattern from system prompt
+            name_candidate = new_observation.split(":", 1)[1].strip()
+        elif lower_obs.startswith("name:"):
+            name_candidate = new_observation.split(":", 1)[1].strip()
+        elif lower_obs.startswith("my name is"):
+            name_candidate = new_observation.split("is", 1)[1].strip()
 
-## AI Observations
-- No sessions yet.
-"""
-        self.progress_file.write_text(initial_content)
+        if name_candidate:
+            state["name"] = name_candidate
+            state["pronunciation"] = None  # Placeholder for future extension
+
+        state["sessions"][-1]["observations"].append(new_observation)
+        self._write_state(state)
 
     def get_context_summary(self) -> str:
-        """Generate a concise summary of the user's progress for the AI."""
-        if self.is_first_run():
-            return ""
+        """Return a compact string summary for prompt injection."""
+        state = self._read_state()
+        lines = []
+        if state.get("name"):
+            lines.append(f"USER NAME: {state['name']}")
+        for sess in state.get("sessions", [])[-5:]:  # last 5 sessions
+            lines.append(f"Session {sess['date']}:")
+            for obs in sess["observations"][-5:]:
+                lines.append(f"  - {obs}")
+        return "\n".join(lines)
 
-        progress_content = self.get_progress()
-        return f"USER CONTEXT:\n{progress_content}"
+    # Optional future helper
+    def set_user_name(self, name: str, pronunciation: str | None = None):
+        state = self._read_state()
+        state["name"] = name
+        if pronunciation:
+            state["pronunciation"] = pronunciation
+        self._write_state(state)
+
+    # Generic field updater exposed to LLM tools
+    def update_field(self, field: str, value):
+        """Update a top-level field (e.g., name or pronunciation) and persist immediately."""
+        allowed = {"name", "pronunciation", "progress"}
+        if field not in allowed:
+            return f"Unsupported field: {field}"
+
+        state = self._read_state()
+        if field == "progress":
+            # Expect value to be a JSON-serialisable object; store inside today's session
+            today = datetime.datetime.now().strftime("%Y-%m-%d")
+            if not state["sessions"] or state["sessions"][-1]["date"] != today:
+                state["sessions"].append({"date": today, "observations": []})
+            state["sessions"][-1]["observations"].append(value)
+        else:
+            state[field] = value
+        self._write_state(state)
+        return f"{field} updated"

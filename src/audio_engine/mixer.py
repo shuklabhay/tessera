@@ -66,3 +66,15 @@ class AudioMixer:
         with self.lock:
             for ch in self.channels:
                 ch.stop()
+
+    def get_free_channel_index(self):
+        """Return index of first free channel, or None if all busy."""
+        for idx, ch in enumerate(self.channels):
+            if not ch.get_busy():
+                return idx
+
+        # Expand mixer channels if all are busy
+        new_idx = len(self.channels)
+        pygame.mixer.set_num_channels(new_idx + 1)
+        self.channels.append(pygame.mixer.Channel(new_idx))
+        return new_idx

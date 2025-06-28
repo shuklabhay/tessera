@@ -5,7 +5,6 @@ import pygame
 
 from audio_engine.audio_loader import AudioLoader
 from audio_engine.mixer import AudioMixer
-from audio_engine.noise_generator import NoiseGenerator
 
 
 class AudioController:
@@ -14,15 +13,9 @@ class AudioController:
         pygame.mixer.init()
         self.loader = AudioLoader()
         self.mixer = AudioMixer()
-        self.noise_gen = NoiseGenerator()
-        self.active_streams = {}
-        self.channel_map = {
-            "environmental": 0,
-            "noise": 1,
-            "speakers": 2,
-            "procedural_noise": 3,
-            "gemini": 7,
-        }
+        self.clips = {}
+        self._next_clip_id = 1  # incremental clip ids
+        self.channel_map = {"gemini": 7}
 
     def play_gemini_chunk(self, audio_chunk_bytes):
         """Play raw audio chunk from Gemini as stereo sound."""
@@ -63,14 +56,28 @@ class AudioController:
             audio_array = np.ascontiguousarray((audio * 32767).astype(np.int16))
             sound = pygame.sndarray.make_sound(audio_array)
 
-            # Play on environmental channel
-            channel = self.channel_map["environmental"]
-            self.mixer.play(sound, channel, loops=-1, volume=volume)
-            self.active_streams["environmental"] = channel
+            # Allocate channel
+            channel = self._get_free_non_reserved_channel()
+            if channel is None:
+                return "No free audio channels available"
 
-            # Get description
+            self.mixer.play(sound, channel, loops=-1, volume=volume)
+
             description = self._get_audio_description(filepath)
-            return f"Playing environmental sound. Description: {description}"
+            clip_id = self._next_clip_id
+            self._next_clip_id += 1
+            self.clips[clip_id] = {
+                "type": "environmental",
+                "channel": channel,
+                "volume": volume,
+                "pan": 0.0,
+                "description": description,
+            }
+            return {
+                "clip_id": clip_id,
+                "description": description,
+                "type": "environmental",
+            }
         return "No environmental sounds available"
 
     def play_speaker_sound(self, volume=0.7):
@@ -81,14 +88,24 @@ class AudioController:
             audio_array = np.ascontiguousarray((audio * 32767).astype(np.int16))
             sound = pygame.sndarray.make_sound(audio_array)
 
-            # Play on speakers channel
-            channel = self.channel_map["speakers"]
-            self.mixer.play(sound, channel, loops=-1, volume=volume)
-            self.active_streams["speakers"] = channel
+            # Allocate channel
+            channel = self._get_free_non_reserved_channel()
+            if channel is None:
+                return "No free audio channels available"
 
-            # Get description
+            self.mixer.play(sound, channel, loops=-1, volume=volume)
+
             description = self._get_audio_description(filepath)
-            return f"Playing speaker audio. Description: {description}"
+            clip_id = self._next_clip_id
+            self._next_clip_id += 1
+            self.clips[clip_id] = {
+                "type": "speakers",
+                "channel": channel,
+                "volume": volume,
+                "pan": 0.0,
+                "description": description,
+            }
+            return {"clip_id": clip_id, "description": description, "type": "speakers"}
         return "No speaker audio available"
 
     def play_noise_sound(self, volume=0.7):
@@ -99,94 +116,76 @@ class AudioController:
             audio_array = np.ascontiguousarray((audio * 32767).astype(np.int16))
             sound = pygame.sndarray.make_sound(audio_array)
 
-            # Play on noise channel
-            channel = self.channel_map["noise"]
-            self.mixer.play(sound, channel, loops=-1, volume=volume)
-            self.active_streams["noise"] = channel
+            # Allocate channel
+            channel = self._get_free_non_reserved_channel()
+            if channel is None:
+                return "No free audio channels available"
 
-            # Get description
+            self.mixer.play(sound, channel, loops=-1, volume=volume)
+
             description = self._get_audio_description(filepath)
-            return f"Playing noise audio. Description: {description}"
+            clip_id = self._next_clip_id
+            self._next_clip_id += 1
+            self.clips[clip_id] = {
+                "type": "noise",
+                "channel": channel,
+                "volume": volume,
+                "pan": 0.0,
+                "description": description,
+            }
+            return {"clip_id": clip_id, "description": description, "type": "noise"}
         return "No noise audio available"
 
-    def generate_white_noise(self, volume=0.5, duration=10):
-        """Generate continuous white noise."""
-        # Generate noise data
-        noise_data = self.noise_gen.white(duration, amplitude=0.5)
-        noise_data = (noise_data * 32767).astype(np.int16)
-
-        # Convert to stereo
-        noise_stereo = np.column_stack((noise_data, noise_data))
-        sound = pygame.sndarray.make_sound(noise_stereo)
-
-        # Play on procedural noise channel
-        channel = self.channel_map["procedural_noise"]
-        self.mixer.play(sound, channel, loops=-1, volume=volume)
-        self.active_streams["white_noise"] = channel
-        return f"Generating white noise at {int(volume*100)}% volume"
-
-    def generate_pink_noise(self, volume=0.5, duration=10):
-        """Generate continuous pink noise."""
-        # Generate noise data
-        noise_data = self.noise_gen.pink(duration, amplitude=0.5)
-        noise_data = (noise_data * 32767).astype(np.int16)
-
-        # Convert to stereo
-        noise_stereo = np.column_stack((noise_data, noise_data))
-        sound = pygame.sndarray.make_sound(noise_stereo)
-
-        # Play on procedural noise channel
-        channel = self.channel_map["procedural_noise"]
-        self.mixer.play(sound, channel, loops=-1, volume=volume)
-        self.active_streams["pink_noise"] = channel
-        return f"Generating pink noise at {int(volume*100)}% volume"
-
-    def generate_brown_noise(self, volume=0.5, duration=10):
-        """Generate continuous brown noise."""
-        # Generate noise data
-        noise_data = self.noise_gen.brown(duration, amplitude=0.5)
-        noise_data = (noise_data * 32767).astype(np.int16)
-
-        # Convert to stereo
-        noise_stereo = np.column_stack((noise_data, noise_data))
-        sound = pygame.sndarray.make_sound(noise_stereo)
-
-        # Play on procedural noise channel
-        channel = self.channel_map["procedural_noise"]
-        self.mixer.play(sound, channel, loops=-1, volume=volume)
-        self.active_streams["brown_noise"] = channel
-        return f"Generating brown noise at {int(volume*100)}% volume"
-
-    def pan_audio(self, audio_type, pan):
-        """Pan an audio source left or right."""
-        # Clamp pan value
+    def pan_audio(self, audio_type, pan, clip_id=None):
+        """Pan an audio source left or right. If clip_id given, target that clip only."""
         pan = max(-1.0, min(1.0, pan))
 
-        if audio_type in self.active_streams:
-            channel_idx = self.active_streams[audio_type]
-            self.mixer.set_pan(channel_idx, pan)
-            return f"Panned {audio_type} to {pan}"
-        return f"No active {audio_type} stream to pan."
+        if clip_id is None:
+            return "clip_id required."
 
-    def adjust_volume(self, audio_type, volume):
-        """Adjust the volume of a specific audio type."""
-        # Clamp volume value
+        try:
+            cid_int = int(clip_id)
+        except (ValueError, TypeError):
+            return f"Invalid clip_id {clip_id}."
+
+        clip = self.clips.get(cid_int)
+        if not clip:
+            return f"Unknown clip_id {clip_id}."
+        self.mixer.set_pan(clip["channel"], pan)
+        clip["pan"] = pan
+        return f"Panned clip {cid_int} to {pan}."
+
+    def adjust_volume(self, audio_type, volume, clip_id=None):
+        """Adjust volume globally for type or for specific clip."""
         volume = max(0.0, min(1.0, volume))
 
-        if audio_type in self.active_streams:
-            channel_idx = self.active_streams[audio_type]
-            self.mixer.set_volume(channel_idx, volume)
-            return f"Adjusted {audio_type} volume to {int(volume*100)}%"
-        return f"No active {audio_type} stream to adjust"
+        if clip_id is None:
+            return "clip_id required."
+
+        try:
+            cid_int = int(clip_id)
+        except (ValueError, TypeError):
+            return f"Invalid clip_id {clip_id}."
+
+        clip = self.clips.get(cid_int)
+        if not clip:
+            return f"Unknown clip_id {clip_id}."
+        self.mixer.set_volume(clip["channel"], volume)
+        clip["volume"] = volume
+        return f"Volume for clip {cid_int} set to {int(volume*100)}%"
 
     def stop_audio(self, audio_type=None):
         """Stop a specific audio type or all audio if none specified."""
-        if audio_type and audio_type in self.active_streams:
-            # Stop specific audio type
-            channel_idx = self.active_streams[audio_type]
-            self.mixer.stop(channel_idx)
-            del self.active_streams[audio_type]
+        if audio_type and not audio_type == "clip":
+            to_remove = [
+                cid for cid, m in self.clips.items() if m["type"] == audio_type
+            ]
+            for cid in to_remove:
+                self.mixer.stop(self.clips[cid]["channel"])
+                del self.clips[cid]
             return f"Stopped {audio_type} audio"
+        elif audio_type == "clip":
+            return "Use stop_audio with clip_id parameter (not implemented via tools)."
         elif not audio_type:
             # Stop all audio
             return self.stop_all_audio()
@@ -194,14 +193,31 @@ class AudioController:
 
     def get_status(self):
         """Get current audio playback status."""
-        active = list(self.active_streams.keys())
-        if active:
-            return f"Currently playing: {', '.join(active)}"
-        return "No background audio currently playing"
+        if not self.clips:
+            return []
+        return [
+            {
+                "clip_id": cid,
+                "type": meta["type"],
+                "volume": meta["volume"],
+                "pan": meta["pan"],
+                "description": meta["description"],
+            }
+            for cid, meta in self.clips.items()
+        ]
 
     def stop_all_audio(self):
         """Stop all active audio streams."""
-        stopped_streams = list(self.active_streams.keys())
         self.mixer.stop_all()
-        self.active_streams.clear()
-        return f"Stopped all audio streams: {', '.join(stopped_streams) if stopped_streams else 'No active streams'}"
+        self.clips.clear()
+        return "Stopped all audio streams."
+
+    # Internal util
+    def _get_free_non_reserved_channel(self):
+        reserved = set(self.channel_map.values())
+        for idx in range(len(self.mixer.channels)):
+            if idx in reserved:
+                continue
+            if not self.mixer.channels[idx].get_busy():
+                return idx
+        return None

@@ -117,57 +117,6 @@ class LLMManager:
                         ),
                     ),
                     types.FunctionDeclaration(
-                        name="generate_white_noise",
-                        description="Generate continuous white noise.",
-                        parameters=types.Schema(
-                            type=types.Type.OBJECT,
-                            properties={
-                                "volume": types.Schema(
-                                    type=types.Type.NUMBER,
-                                    description="Volume from 0.0 to 1.0",
-                                ),
-                                "duration": types.Schema(
-                                    type=types.Type.NUMBER,
-                                    description="Duration of the noise in seconds.",
-                                ),
-                            },
-                        ),
-                    ),
-                    types.FunctionDeclaration(
-                        name="generate_pink_noise",
-                        description="Generate continuous pink noise.",
-                        parameters=types.Schema(
-                            type=types.Type.OBJECT,
-                            properties={
-                                "volume": types.Schema(
-                                    type=types.Type.NUMBER,
-                                    description="Volume from 0.0 to 1.0",
-                                ),
-                                "duration": types.Schema(
-                                    type=types.Type.NUMBER,
-                                    description="Duration of the noise in seconds.",
-                                ),
-                            },
-                        ),
-                    ),
-                    types.FunctionDeclaration(
-                        name="generate_brown_noise",
-                        description="Generate brown noise.",
-                        parameters=types.Schema(
-                            type=types.Type.OBJECT,
-                            properties={
-                                "volume": types.Schema(
-                                    type=types.Type.NUMBER,
-                                    description="Volume from 0.0 to 1.0",
-                                ),
-                                "duration": types.Schema(
-                                    type=types.Type.NUMBER,
-                                    description="Duration in seconds",
-                                ),
-                            },
-                        ),
-                    ),
-                    types.FunctionDeclaration(
                         name="adjust_volume",
                         description="Adjust the volume of a specific audio type.",
                         parameters=types.Schema(
@@ -177,12 +126,16 @@ class LLMManager:
                                     type=types.Type.STRING,
                                     description="The type of audio to adjust.",
                                 ),
+                                "clip_id": types.Schema(
+                                    type=types.Type.INTEGER,
+                                    description="clip_id returned by get_status identifying which clip to adjust.",
+                                ),
                                 "volume": types.Schema(
                                     type=types.Type.NUMBER,
                                     description="The new volume from 0.0 to 1.0.",
                                 ),
                             },
-                            required=["audio_type", "volume"],
+                            required=["clip_id", "volume"],
                         ),
                     ),
                     types.FunctionDeclaration(
@@ -195,12 +148,16 @@ class LLMManager:
                                     type=types.Type.STRING,
                                     description="The type of audio to pan.",
                                 ),
+                                "clip_id": types.Schema(
+                                    type=types.Type.INTEGER,
+                                    description="clip_id returned by get_status identifying which clip to pan.",
+                                ),
                                 "pan": types.Schema(
                                     type=types.Type.NUMBER,
                                     description="Pan value from -1.0 (left) to 1.0 (right).",
                                 ),
                             },
-                            required=["audio_type", "pan"],
+                            required=["clip_id", "pan"],
                         ),
                     ),
                     types.FunctionDeclaration(
@@ -227,18 +184,37 @@ class LLMManager:
                         parameters=types.Schema(type=types.Type.OBJECT),
                     ),
                     types.FunctionDeclaration(
-                        name="update_progress_file",
-                        description="Logs a new observation about the user's performance.",
+                        name="set_pronunciation",
+                        description="Save how the user's name should be pronounced. Call exactly once after they say their name.",
                         parameters=types.Schema(
                             type=types.Type.OBJECT,
                             properties={
-                                "new_observation": types.Schema(
+                                "pronunciation": types.Schema(
                                     type=types.Type.STRING,
-                                    description="A concise summary of the observation.",
+                                    description="Pronunciation text Kai should use for addressing the user.",
                                 )
                             },
-                            required=["new_observation"],
+                            required=["pronunciation"],
                         ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="add_session_observation",
+                        description="Append a short JSON-compatible summary of the latest session observation to progress log.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "summary": types.Schema(
+                                    type=types.Type.STRING,
+                                    description="Concise observation text.",
+                                )
+                            },
+                            required=["summary"],
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="read_progress_log",
+                        description="Return a concise textual summary of the user progress JSON.",
+                        parameters=types.Schema(type=types.Type.OBJECT),
                     ),
                 ]
             )
@@ -329,9 +305,6 @@ class LLMManager:
         function_name = function_call.name
         args = function_call.args if hasattr(function_call, "args") else {}
 
-        # Debug print for all tool invocations
-        print(f"[TOOL DEBUG] {function_name} called with args: {args}", flush=True)
-
         if function_name == "play_environmental_sound":
             volume = args.get("volume", 0.7)
             return self.audio_controller.play_environmental_sound(volume)
@@ -341,25 +314,13 @@ class LLMManager:
         elif function_name == "play_noise_sound":
             volume = args.get("volume", 0.7)
             return self.audio_controller.play_noise_sound(volume)
-        elif function_name == "generate_white_noise":
-            volume = args.get("volume", 0.3)
-            duration = args.get("duration", 10)
-            return self.audio_controller.generate_white_noise(volume, duration)
-        elif function_name == "generate_pink_noise":
-            volume = args.get("volume", 0.3)
-            duration = args.get("duration", 10)
-            return self.audio_controller.generate_pink_noise(volume, duration)
-        elif function_name == "generate_brown_noise":
-            volume = args.get("volume", 0.3)
-            duration = args.get("duration", 10)
-            return self.audio_controller.generate_brown_noise(volume, duration)
         elif function_name == "adjust_volume":
             return self.audio_controller.adjust_volume(
-                args.get("audio_type"), args.get("volume")
+                args.get("audio_type"), args.get("volume"), args.get("clip_id")
             )
         elif function_name == "pan_audio":
             return self.audio_controller.pan_audio(
-                args.get("audio_type"), args.get("pan")
+                args.get("audio_type"), args.get("pan"), args.get("clip_id")
             )
         elif function_name == "stop_audio":
             return self.audio_controller.stop_audio(args.get("audio_type"))
@@ -367,11 +328,18 @@ class LLMManager:
             return self.audio_controller.stop_all_audio()
         elif function_name == "get_status":
             return self.audio_controller.get_status()
-        elif function_name == "update_progress_file":
-            new_observation = args.get("new_observation")
-            if new_observation:
-                return self.update_progress_file(new_observation)
-            return "Error: new_observation not provided for progress log."
+        elif function_name == "set_pronunciation":
+            pron = args.get("pronunciation")
+            if pron:
+                return self.state_manager.update_field("pronunciation", pron)
+            return "Error: pronunciation not provided."
+        elif function_name == "add_session_observation":
+            summary = args.get("summary")
+            if summary:
+                return self.update_progress_file(summary)
+            return "Error: summary not provided."
+        elif function_name == "read_progress_log":
+            return self.state_manager.get_context_summary()
         else:
             return f"Unknown function: {function_name}"
 
@@ -383,15 +351,29 @@ class LLMManager:
                 if not self.running:
                     break
 
-                if response.tool_call and response.tool_call.function_calls:
-                    for function_call in response.tool_call.function_calls:
+                if (
+                    hasattr(response, "tool_call")
+                    and response.tool_call
+                    and hasattr(response.tool_call, "function_calls")
+                ):
+                    # Model can emit one or many function calls in the same turn
+                    fc_list = list(response.tool_call.function_calls)
+                    for idx, function_call in enumerate(fc_list):
                         result = self.execute_function(function_call)
                         function_response = types.FunctionResponse(
                             name=function_call.name,
-                            response={"result": str(result)},
+                            response=(
+                                result
+                                if isinstance(result, dict)
+                                else {"result": str(result)}
+                            ),
                         )
-                        await self.session.send(input=function_response)
-                    continue
+
+                        # Send each response; mark end_of_turn only on the last one so model knows execution finished
+                        is_last = idx == len(fc_list) - 1
+                        await self.session.send(
+                            input=function_response, end_of_turn=is_last
+                        )
 
                 if response.server_content and response.server_content.model_turn:
                     for part in response.server_content.model_turn.parts:
