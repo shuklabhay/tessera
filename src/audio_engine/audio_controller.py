@@ -14,8 +14,9 @@ class AudioController:
         self.loader = AudioLoader()
         self.mixer = AudioMixer()
         self.clips = {}
-        self._next_clip_id = 1  # incremental clip ids
+        self._next_clip_id = 1
         self.channel_map = {"gemini": 7}
+        self._ducked = False
 
     def play_gemini_chunk(self, audio_chunk_bytes):
         """Play raw audio chunk from Gemini as stereo sound."""
@@ -211,6 +212,30 @@ class AudioController:
         self.mixer.stop_all()
         self.clips.clear()
         return "Stopped all audio streams."
+
+    def duck_background(self, enable: bool, factor: float = 0.3):
+        """Temporarily reduce or restore background clip volumes."""
+        # Exit if the requested state is already set
+        if enable and self._ducked:
+            return
+        if not enable and not self._ducked:
+            return
+
+        # Adjust volume across all active clips
+        for _, meta in self.clips.items():
+            current_channel = meta["channel"]
+            if enable:
+                meta["_orig_volume"] = meta.get("_orig_volume", meta["volume"])
+                new_volume = meta["_orig_volume"] * factor
+                self.mixer.set_volume(current_channel, new_volume)
+                meta["volume"] = new_volume
+            else:
+                if "_orig_volume" in meta:
+                    self.mixer.set_volume(current_channel, meta["_orig_volume"])
+                    meta["volume"] = meta["_orig_volume"]
+                    del meta["_orig_volume"]
+
+        self._ducked = enable
 
     # Internal util
     def _get_free_non_reserved_channel(self):

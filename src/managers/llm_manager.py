@@ -60,6 +60,8 @@ class LLMManager:
         self.state_manager = StateManager()
         self.system_prompt = self._get_contextual_system_prompt()
         self.audio_controller = AudioController()
+        self.startup_phase = self._determine_startup_phase()
+        self._log_intro_pending = False
         self.loop = None
         self.thread = None
 
@@ -69,6 +71,23 @@ class LLMManager:
         if context_summary:
             return f"{context_summary}\n\n{base_prompt}"
         return base_prompt
+
+    def _determine_startup_phase(self):
+        """Return startup phase keyword based on persisted state."""
+        state = self.state_manager._read_state()
+
+        # Ask name if missing regardless of sessions
+        if not state.get("name"):
+            return "ask_name"
+
+        # Introduction when no previous sessions and name known
+        if not state.get("sessions"):
+            return "intro"
+
+        # Simple heuristic for training vs diagnostic
+        if len(state["sessions"]) < 5:
+            return "training"
+        return "diagnostic"
 
     def update_progress_file(self, new_observation: str) -> str:
         self.state_manager.update_progress(new_observation)
@@ -411,6 +430,7 @@ class LLMManager:
                         if part.inline_data and part.inline_data.data:
                             if not self.gemini_speaking:
                                 self.gemini_speaking = True
+                                self.audio_controller.duck_background(True)
                             has_audio_in_turn = True
                             audio_data = part.inline_data.data
                             self.out_queue.put_nowait(audio_data)
@@ -441,26 +461,28 @@ class LLMManager:
             await self.turn_ended.wait()
             await self.out_queue.join()
             self.gemini_speaking = False
+            # Log introduction completion once the first intro speech ends
+            if self._log_intro_pending:
+                self.state_manager.update_progress("Introduction finished.")
+                self._log_intro_pending = False
             self.turn_ended.clear()
 
     async def _send_initial_prompt(self):
-        if self.state_manager.is_first_run():
-            # For first-time users, trigger immediate introduction
-            await self.session.send_client_content(
-                turns={
-                    "role": "user",
-                    "parts": [{"text": "Initialize introduction phase for new user."}],
-                },
-                turn_complete=True,
-            )
+        # Choose initial user message based on startup phase
+        if self.startup_phase == "ask_name":
+            text = "Hi, I'm Kai. What is your name?"
+        elif self.startup_phase == "intro":
+            text = "Initialize introduction phase for new user."
+            self._log_intro_pending = True
+        elif self.startup_phase == "training":
+            text = "Resume appropriate training stage based on prior sessions."
         else:
-            await self.session.send_client_content(
-                turns={
-                    "role": "user",
-                    "parts": [{"text": "I'm back and ready to continue."}],
-                },
-                turn_complete=True,
-            )
+            text = "Begin diagnostic assessment session."
+
+        await self.session.send_client_content(
+            turns={"role": "user", "parts": [{"text": text}]},
+            turn_complete=True,
+        )
 
     async def run_async(self):
         self.running = True
