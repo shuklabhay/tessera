@@ -5,8 +5,9 @@ from pathlib import Path
 
 class StateManager:
     def __init__(self, progress_file: str = "src/prompts/progress.json"):
-        root = Path(__file__).resolve().parents[2]  # project root
-        self.progress_file = (root / progress_file).resolve()
+        repo_root = Path(__file__).resolve().parents[2]
+        self.progress_file = (repo_root / progress_file).resolve()
+
         self._ensure_progress_file_exists()
 
     def _ensure_progress_file_exists(self):
@@ -34,28 +35,12 @@ class StateManager:
         return state.get("sessions") == []
 
     def update_progress(self, new_observation: str):
-        """Append an observation to the latest session (create session if needed)."""
+        """Append a raw observation string to today's session."""
         state = self._read_state()
+
         today = datetime.datetime.now().strftime("%Y-%m-%d")
-
-        if not state["sessions"] or state["sessions"][-1]["date"] != today:
-            state["sessions"].append({"date": today, "observations": []})
-
-        # Name capture heuristics
-        lower_obs = new_observation.lower()
-        name_candidate = None
-
-        if lower_obs.startswith("user name captured:"):
-            # Expected pattern from system prompt
-            name_candidate = new_observation.split(":", 1)[1].strip()
-        elif lower_obs.startswith("name:"):
-            name_candidate = new_observation.split(":", 1)[1].strip()
-        elif lower_obs.startswith("my name is"):
-            name_candidate = new_observation.split("is", 1)[1].strip()
-
-        if name_candidate:
-            state["name"] = name_candidate
-            state["pronunciation"] = None  # Placeholder for future extension
+        if not state.get("sessions") or state["sessions"][-1]["date"] != today:
+            state.setdefault("sessions", []).append({"date": today, "observations": []})
 
         state["sessions"][-1]["observations"].append(new_observation)
         self._write_state(state)
@@ -82,19 +67,8 @@ class StateManager:
 
     # Generic field updater exposed to LLM tools
     def update_field(self, field: str, value):
-        """Update a top-level field (e.g., name or pronunciation) and persist immediately."""
-        allowed = {"name", "pronunciation", "progress"}
-        if field not in allowed:
-            return f"Unsupported field: {field}"
-
+        """Update any top-level field and persist immediately."""
         state = self._read_state()
-        if field == "progress":
-            # Expect value to be a JSON-serialisable object; store inside today's session
-            today = datetime.datetime.now().strftime("%Y-%m-%d")
-            if not state["sessions"] or state["sessions"][-1]["date"] != today:
-                state["sessions"].append({"date": today, "observations": []})
-            state["sessions"][-1]["observations"].append(value)
-        else:
-            state[field] = value
+        state[field] = value
         self._write_state(state)
         return f"{field} updated"

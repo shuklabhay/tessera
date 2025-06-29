@@ -56,6 +56,7 @@ class LLMManager:
         self.last_voice_detected = 0
         self.recording_duration = 1.5
         self.check_time = 0
+        self.silence_start_time = None
         self.state_manager = StateManager()
         self.system_prompt = self._get_contextual_system_prompt()
         self.audio_controller = AudioController()
@@ -272,6 +273,17 @@ class LLMManager:
             self.check_time = current_time + self.recording_duration
             self.audio_in_queue.put_nowait(bytes(indata))
 
+        # Mark turn end
+        elif not self.recording and amplitude < self.speech_threshold:
+            if self.silence_start_time is None:
+                self.silence_start_time = current_time
+            elif (current_time - self.silence_start_time) >= self.recording_duration:
+                self.audio_in_queue.put_nowait(None)
+                self.silence_start_time = None
+        else:
+            # Reset silence timer if any non-silent activity detected.
+            self.silence_start_time = None
+
     async def listen_audio(self):
         self.recording = False
         self.last_voice_detected = time_module.time()
@@ -293,13 +305,25 @@ class LLMManager:
         self.input_stream.close()
 
     async def send_audio(self):
+        chunk_sent = False
         while self.running:
             audio_chunk = await self.audio_in_queue.get()
+
             if self.session and audio_chunk is not None:
-                turn = {"data": audio_chunk, "mime_type": "audio/pcm"}
-                await self.session.send(input=turn)
+                # We only transmit chunks once voice has crossed the threshold
+                await self.session.send_realtime_input(
+                    audio=types.Blob(
+                        data=audio_chunk,
+                        mime_type="audio/pcm;rate=16000",
+                    )
+                )
+                chunk_sent = True
+
             elif self.session and audio_chunk is None:
-                await self.session.send(end_of_turn=True)
+                # Send end-of-turn only if at least one chunk was delivered
+                if chunk_sent:
+                    await self.session.send_realtime_input(audio_stream_end=True)
+                chunk_sent = False
 
     def execute_function(self, function_call):
         function_name = function_call.name
@@ -358,22 +382,29 @@ class LLMManager:
                 ):
                     # Model can emit one or many function calls in the same turn
                     fc_list = list(response.tool_call.function_calls)
-                    for idx, function_call in enumerate(fc_list):
+                    function_responses = []
+                    for function_call in fc_list:
                         result = self.execute_function(function_call)
-                        function_response = types.FunctionResponse(
-                            name=function_call.name,
-                            response=(
-                                result
-                                if isinstance(result, dict)
-                                else {"result": str(result)}
-                            ),
+                        function_responses.append(
+                            types.FunctionResponse(
+                                id=(
+                                    function_call.id
+                                    if hasattr(function_call, "id")
+                                    else None
+                                ),
+                                name=function_call.name,
+                                response=(
+                                    result
+                                    if isinstance(result, dict)
+                                    else {"result": str(result)}
+                                ),
+                            )
                         )
 
-                        # Send each response; mark end_of_turn only on the last one so model knows execution finished
-                        is_last = idx == len(fc_list) - 1
-                        await self.session.send(
-                            input=function_response, end_of_turn=is_last
-                        )
+                    # Send all responses together (Live API infers turn completion)
+                    await self.session.send_tool_response(
+                        function_responses=function_responses
+                    )
 
                 if response.server_content and response.server_content.model_turn:
                     for part in response.server_content.model_turn.parts:
@@ -415,12 +446,20 @@ class LLMManager:
     async def _send_initial_prompt(self):
         if self.state_manager.is_first_run():
             # For first-time users, trigger immediate introduction
-            await self.session.send(
-                input="Initialize introduction phase for new user.", end_of_turn=True
+            await self.session.send_client_content(
+                turns={
+                    "role": "user",
+                    "parts": [{"text": "Initialize introduction phase for new user."}],
+                },
+                turn_complete=True,
             )
         else:
-            await self.session.send(
-                input="I'm back and ready to continue.", end_of_turn=True
+            await self.session.send_client_content(
+                turns={
+                    "role": "user",
+                    "parts": [{"text": "I'm back and ready to continue."}],
+                },
+                turn_complete=True,
             )
 
     async def run_async(self):
