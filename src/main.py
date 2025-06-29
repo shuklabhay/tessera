@@ -1,5 +1,3 @@
-import asyncio
-
 from managers.llm_manager import LLMManager
 from ui.main_app import UnlockHearingApp
 

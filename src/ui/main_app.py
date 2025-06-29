@@ -78,7 +78,5 @@ class UnlockHearingApp(App):
 
     def on_stop(self):
         """Clean up when app closes."""
-        if self.llm_manager:
-            print("🛑 App closing, stopping LLM Manager...", flush=True)
-            self.llm_manager.stop()
+        self.llm_manager.stop()
         return True

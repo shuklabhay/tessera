@@ -76,11 +76,7 @@ class LLMManager:
         """Return startup phase keyword based on persisted state."""
         state = self.state_manager._read_state()
 
-        # Ask name if missing regardless of sessions
-        if not state.get("name"):
-            return "ask_name"
-
-        # Introduction when no previous sessions and name known
+        # Introduction when no previous sessions
         if not state.get("sessions"):
             return "intro"
 
@@ -469,9 +465,7 @@ class LLMManager:
 
     async def _send_initial_prompt(self):
         # Choose initial user message based on startup phase
-        if self.startup_phase == "ask_name":
-            text = "Hi, I'm Kai. What is your name?"
-        elif self.startup_phase == "intro":
+        if self.startup_phase == "intro":
             text = "Initialize introduction phase for new user."
             self._log_intro_pending = True
         elif self.startup_phase == "training":

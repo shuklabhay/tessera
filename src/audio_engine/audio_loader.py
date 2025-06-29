@@ -18,10 +18,7 @@ AUDIO_DIRS = {
 
 class AudioLoader:
     def __init__(self):
-        self.cache = {k: [] for k in AUDIO_DIRS}
-        self.lock = Lock()
         self.paths = AUDIO_DIRS
-        self._start_background_cache()
 
     def _scan_files(self, category):
         """Scan directory for audio files in the given category."""
@@ -99,16 +96,10 @@ class AudioLoader:
         return audio, filepath
 
     def get_cached_audio(self, category):
-        """Get a random audio file from cache, or load directly if cache is empty."""
-        # Try to get from cache first
-        with self.lock:
-            if category in self.cache and self.cache[category]:
-                cached_item = random.choice(self.cache[category])
-                return cached_item["audio"], cached_item["filepath"]
-
-        # Fallback to direct loading
-        print(f"Cache miss for category {category}, loading directly.")
+        """Return freshly loaded random audio (no caching)."""
         audio, filepath = self.get_random_audio(category)
+        if audio is not None:
+            audio = self._normalize_audio(audio)
         return audio, filepath
 
     def _normalize_audio(self, audio):
@@ -119,30 +110,3 @@ class AudioLoader:
         if max_val > 0:
             return audio / max_val
         return audio
-
-    def _cache_category(self, category):
-        """Load and cache all audio files for a category."""
-        files = self._scan_files(category)
-        loaded = []
-
-        # Load and normalize each file
-        for f in files:
-            audio = self.load_audio(f)
-            if audio is not None:
-                normalized_audio = self._normalize_audio(audio)
-                loaded.append({"audio": normalized_audio, "filepath": f})
-
-        # Update cache
-        with self.lock:
-            self.cache[category] = loaded
-        print(f"Cached {len(loaded)} {category} audio files")
-
-    def _background_cache(self):
-        """Cache all audio categories in background."""
-        for category in AUDIO_DIRS:
-            self._cache_category(category)
-
-    def _start_background_cache(self):
-        """Start background thread to cache audio files."""
-        t = Thread(target=self._background_cache, daemon=True)
-        t.start()
