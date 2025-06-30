@@ -57,6 +57,10 @@ class StateManager:
                 lines.append(f"  - {obs}")
         return "\n".join(lines)
 
+    def get_full_progress(self) -> str:
+        """Return the complete progress JSON as a formatted string."""
+        return json.dumps(self._read_state(), indent=2)
+
     # Optional future helper
     def set_user_name(self, name: str, pronunciation: str | None = None):
         state = self._read_state()

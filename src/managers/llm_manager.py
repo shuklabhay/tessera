@@ -232,6 +232,11 @@ class LLMManager:
                         description="Return a concise textual summary of the user progress JSON.",
                         parameters=types.Schema(type=types.Type.OBJECT),
                     ),
+                    types.FunctionDeclaration(
+                        name="see_full_progress",
+                        description="Return the entire progress JSON file as formatted text.",
+                        parameters=types.Schema(type=types.Type.OBJECT),
+                    ),
                 ]
             )
         ]
@@ -280,10 +285,12 @@ class LLMManager:
                 else:
                     self.recording = False
                     self.audio_in_queue.put_nowait(None)
+                    self.audio_controller.duck_background(False)
 
         # Start recording when speech detected
         elif amplitude > self.speech_threshold:
             self.recording = True
+            self.audio_controller.duck_background(True)
             self.last_voice_detected = current_time
             self.check_time = current_time + self.recording_duration
             self.audio_in_queue.put_nowait(bytes(indata))
@@ -295,6 +302,7 @@ class LLMManager:
             elif (current_time - self.silence_start_time) >= self.recording_duration:
                 self.audio_in_queue.put_nowait(None)
                 self.silence_start_time = None
+                self.audio_controller.duck_background(False)
         else:
             # Reset silence timer if any non-silent activity detected.
             self.silence_start_time = None
@@ -379,6 +387,8 @@ class LLMManager:
             return "Error: summary not provided."
         elif function_name == "read_progress_log":
             return self.state_manager.get_context_summary()
+        elif function_name == "see_full_progress":
+            return self.state_manager.get_full_progress()
         else:
             return f"Unknown function: {function_name}"
 
