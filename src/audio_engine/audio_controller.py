@@ -1,10 +1,14 @@
 import os
+import threading
+import time
 
 import numpy as np
 import pygame
 
 from audio_engine.audio_loader import AudioLoader
 from audio_engine.mixer import AudioMixer
+
+MAX_VOLUME = 0.8
 
 
 class AudioController:
@@ -17,6 +21,7 @@ class AudioController:
         self._next_clip_id = 1
         self.channel_map = {"gemini": 7}
         self._ducked = False
+        self._panning_threads = {}
 
     def play_gemini_chunk(self, audio_chunk_bytes):
         """Play raw audio chunk from Gemini as stereo sound."""
@@ -51,6 +56,7 @@ class AudioController:
 
     def play_environmental_sound(self, volume=0.7):
         """Play a random environmental soundscape on loop."""
+        volume = max(0.0, min(MAX_VOLUME, volume))
         audio, filepath = self.loader.get_cached_audio("environmental")
         if audio is not None:
             # Convert for pygame
@@ -83,6 +89,7 @@ class AudioController:
 
     def play_speaker_sound(self, volume=0.7):
         """Play a random person speaking audio on loop."""
+        volume = max(0.0, min(MAX_VOLUME, volume))
         audio, filepath = self.loader.get_cached_audio("speakers")
         if audio is not None:
             # Convert to int16 for pygame and ensure contiguous memory
@@ -111,6 +118,7 @@ class AudioController:
 
     def play_noise_sound(self, volume=0.7):
         """Play a random noise sound on loop."""
+        volume = max(0.0, min(MAX_VOLUME, volume))
         audio, filepath = self.loader.get_cached_audio("noise")
         if audio is not None:
             # Convert to int16 for pygame and ensure contiguous memory
@@ -159,6 +167,7 @@ class AudioController:
     def adjust_volume(self, audio_type, volume, clip_id=None):
         """Adjust volume globally for type or for specific clip."""
         volume = max(0.0, min(1.0, volume))
+        volume = min(MAX_VOLUME, volume)
 
         if clip_id is None:
             return "clip_id required."
@@ -209,6 +218,10 @@ class AudioController:
 
     def stop_all_audio(self):
         """Stop all active audio streams."""
+        # Stop all panning patterns first
+        for cid in list(self._panning_threads.keys()):
+            self._stop_panning_thread(cid)
+
         self.mixer.stop_all()
         self.clips.clear()
         return "Stopped all audio streams."
@@ -249,3 +262,222 @@ class AudioController:
             if not self.mixer.channels[idx].get_busy():
                 return idx
         return None
+
+    # Advanced Panning Pattern Methods
+    def _stop_panning_thread(self, clip_id):
+        """Stop any active panning animation for a clip."""
+        if clip_id in self._panning_threads:
+            self._panning_threads[clip_id]["stop"] = True
+            self._panning_threads[clip_id]["thread"].join(timeout=1.0)
+            del self._panning_threads[clip_id]
+
+    def _smooth_pan_transition(
+        self, clip_id, start_pan, end_pan, duration_seconds, steps=20
+    ):
+        """Smoothly transition pan position over time."""
+        clip = self.clips.get(clip_id)
+        if not clip:
+            return
+
+        sleep_time = duration_seconds / steps
+        step_size = (end_pan - start_pan) / steps
+
+        thread_info = self._panning_threads.get(clip_id, {})
+
+        for step in range(steps + 1):
+            if thread_info.get("stop", False):
+                break
+
+            current_pan = start_pan + (step_size * step)
+            current_pan = max(-1.0, min(1.0, current_pan))
+
+            self.mixer.set_pan(clip["channel"], current_pan)
+            clip["pan"] = current_pan
+
+            if step < steps:  # Don't sleep on last iteration
+                time.sleep(sleep_time)
+
+    def pan_pattern_sweep(self, clip_id, direction="left_to_right", speed="moderate"):
+        """Sweep audio across stereo field."""
+        try:
+            cid_int = int(clip_id)
+        except (ValueError, TypeError):
+            return f"Invalid clip_id {clip_id}."
+
+        if cid_int not in self.clips:
+            return f"Unknown clip_id {clip_id}."
+
+        # Stop any existing panning for this clip
+        self._stop_panning_thread(cid_int)
+
+        # Set duration based on speed
+        speed_durations = {"slow": 10.0, "moderate": 5.0, "fast": 2.0}
+        if isinstance(speed, str) and speed in speed_durations:
+            duration = speed_durations[speed]
+        elif isinstance(speed, (int, float)):
+            duration = float(speed)
+        else:
+            duration = 5.0  # Default to moderate
+
+        # Set start/end positions based on direction
+        if direction == "left_to_right":
+            start_pan, end_pan = -1.0, 1.0
+        elif direction == "right_to_left":
+            start_pan, end_pan = 1.0, -1.0
+        elif direction == "center_out":
+            # First move to center, then sweep out
+            self.pan_audio(None, 0.0, cid_int)
+            start_pan, end_pan = 0.0, 1.0
+        else:
+            start_pan, end_pan = -1.0, 1.0
+
+        # Create and start panning thread
+        thread_info = {"stop": False}
+        thread = threading.Thread(
+            target=self._smooth_pan_transition,
+            args=(cid_int, start_pan, end_pan, duration),
+            daemon=True,
+        )
+        thread_info["thread"] = thread
+        self._panning_threads[cid_int] = thread_info
+        thread.start()
+
+        return f"Started {direction} sweep for clip {cid_int} over {duration}s"
+
+    def pan_pattern_pendulum(self, clip_id, cycles=3, duration_per_cycle=3.0):
+        """Create pendulum back-and-forth panning motion."""
+        try:
+            cid_int = int(clip_id)
+        except (ValueError, TypeError):
+            return f"Invalid clip_id {clip_id}."
+
+        if cid_int not in self.clips:
+            return f"Unknown clip_id {clip_id}."
+
+        # Stop any existing panning
+        self._stop_panning_thread(cid_int)
+
+        def pendulum_motion():
+            clip = self.clips.get(cid_int)
+            if not clip:
+                return
+
+            thread_info = self._panning_threads.get(cid_int, {})
+            steps_per_cycle = 40
+            sleep_time = duration_per_cycle / steps_per_cycle
+
+            for cycle in range(cycles):
+                if thread_info.get("stop", False):
+                    break
+
+                # Swing left to right
+                for step in range(steps_per_cycle // 2):
+                    if thread_info.get("stop", False):
+                        break
+                    pan = -1.0 + (2.0 * step / (steps_per_cycle // 2))
+                    pan = max(-1.0, min(1.0, pan))
+                    self.mixer.set_pan(clip["channel"], pan)
+                    clip["pan"] = pan
+                    time.sleep(sleep_time)
+
+                # Swing right to left
+                for step in range(steps_per_cycle // 2):
+                    if thread_info.get("stop", False):
+                        break
+                    pan = 1.0 - (2.0 * step / (steps_per_cycle // 2))
+                    pan = max(-1.0, min(1.0, pan))
+                    self.mixer.set_pan(clip["channel"], pan)
+                    clip["pan"] = pan
+                    time.sleep(sleep_time)
+
+        # Create and start thread
+        thread_info = {"stop": False}
+        thread = threading.Thread(target=pendulum_motion, daemon=True)
+        thread_info["thread"] = thread
+        self._panning_threads[cid_int] = thread_info
+        thread.start()
+
+        return f"Started pendulum motion for clip {cid_int} - {cycles} cycles"
+
+    def pan_pattern_alternating(self, clip_id, interval=2.0, cycles=5):
+        """Alternate between left and right positions."""
+        try:
+            cid_int = int(clip_id)
+        except (ValueError, TypeError):
+            return f"Invalid clip_id {clip_id}."
+
+        if cid_int not in self.clips:
+            return f"Unknown clip_id {clip_id}."
+
+        # Stop any existing panning
+        self._stop_panning_thread(cid_int)
+
+        def alternating_motion():
+            clip = self.clips.get(cid_int)
+            if not clip:
+                return
+
+            thread_info = self._panning_threads.get(cid_int, {})
+            positions = [-0.8, 0.8]  # Slightly inward from extreme positions
+
+            for cycle in range(cycles):
+                if thread_info.get("stop", False):
+                    break
+
+                pan = positions[cycle % 2]
+                self.mixer.set_pan(clip["channel"], pan)
+                clip["pan"] = pan
+
+                time.sleep(interval)
+
+        # Create and start thread
+        thread_info = {"stop": False}
+        thread = threading.Thread(target=alternating_motion, daemon=True)
+        thread_info["thread"] = thread
+        self._panning_threads[cid_int] = thread_info
+        thread.start()
+
+        return f"Started alternating pattern for clip {cid_int} - {cycles} cycles at {interval}s intervals"
+
+    def pan_to_side(self, clip_id, side):
+        """Quickly pan audio to specified side."""
+        try:
+            cid_int = int(clip_id)
+        except (ValueError, TypeError):
+            return f"Invalid clip_id {clip_id}."
+
+        if cid_int not in self.clips:
+            return f"Unknown clip_id {clip_id}."
+
+        # Stop any existing panning animation
+        self._stop_panning_thread(cid_int)
+
+        # Map side to pan value
+        side_map = {
+            "left": -0.8,
+            "right": 0.8,
+            "center": 0.0,
+            "hard_left": -1.0,
+            "hard_right": 1.0,
+            "slight_left": -0.3,
+            "slight_right": 0.3,
+        }
+
+        pan = side_map.get(side.lower(), 0.0)
+
+        return self.pan_audio(None, pan, cid_int)
+
+    def stop_panning_patterns(self, clip_id=None):
+        """Stop panning patterns for specific clip or all clips."""
+        if clip_id is not None:
+            try:
+                cid_int = int(clip_id)
+                self._stop_panning_thread(cid_int)
+                return f"Stopped panning pattern for clip {cid_int}"
+            except (ValueError, TypeError):
+                return f"Invalid clip_id {clip_id}"
+        else:
+            # Stop all panning patterns
+            for cid in list(self._panning_threads.keys()):
+                self._stop_panning_thread(cid)
+            return "Stopped all panning patterns"

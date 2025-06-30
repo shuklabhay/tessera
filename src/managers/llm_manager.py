@@ -69,7 +69,7 @@ class LLMManager:
         base_prompt = load_system_prompt()
         context_summary = self.state_manager.get_context_summary()
         if context_summary:
-            return f"{context_summary}\n\n{base_prompt}"
+            return f"{base_prompt}\n\n---\n\n## Current Session Context\n\n{context_summary}"
         return base_prompt
 
     def _determine_startup_phase(self):
@@ -155,28 +155,6 @@ class LLMManager:
                         ),
                     ),
                     types.FunctionDeclaration(
-                        name="pan_audio",
-                        description="Pan an audio source to the left or right.",
-                        parameters=types.Schema(
-                            type=types.Type.OBJECT,
-                            properties={
-                                "audio_type": types.Schema(
-                                    type=types.Type.STRING,
-                                    description="The type of audio to pan.",
-                                ),
-                                "clip_id": types.Schema(
-                                    type=types.Type.INTEGER,
-                                    description="clip_id returned by get_status identifying which clip to pan.",
-                                ),
-                                "pan": types.Schema(
-                                    type=types.Type.NUMBER,
-                                    description="Pan value from -1.0 (left) to 1.0 (right).",
-                                ),
-                            },
-                            required=["clip_id", "pan"],
-                        ),
-                    ),
-                    types.FunctionDeclaration(
                         name="stop_audio",
                         description="Stop a specific type of audio stream.",
                         parameters=types.Schema(
@@ -236,6 +214,103 @@ class LLMManager:
                         name="see_full_progress",
                         description="Return the entire progress JSON file as formatted text.",
                         parameters=types.Schema(type=types.Type.OBJECT),
+                    ),
+                    types.FunctionDeclaration(
+                        name="pan_pattern_sweep",
+                        description="Sweep audio across stereo field with smooth motion.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "clip_id": types.Schema(
+                                    type=types.Type.INTEGER,
+                                    description="clip_id to apply sweep pattern to.",
+                                ),
+                                "direction": types.Schema(
+                                    type=types.Type.STRING,
+                                    description="Direction: 'left_to_right', 'right_to_left', or 'center_out'.",
+                                ),
+                                "speed": types.Schema(
+                                    type=types.Type.STRING,
+                                    description="Speed: 'slow', 'moderate', or 'fast'.",
+                                ),
+                            },
+                            required=["clip_id"],
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="pan_pattern_pendulum",
+                        description="Create rhythmic back-and-forth panning motion.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "clip_id": types.Schema(
+                                    type=types.Type.INTEGER,
+                                    description="clip_id to apply pendulum pattern to.",
+                                ),
+                                "cycles": types.Schema(
+                                    type=types.Type.INTEGER,
+                                    description="Number of complete swing cycles.",
+                                ),
+                                "duration_per_cycle": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="Seconds per complete cycle.",
+                                ),
+                            },
+                            required=["clip_id"],
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="pan_pattern_alternating",
+                        description="Alternate between left and right positions at intervals.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "clip_id": types.Schema(
+                                    type=types.Type.INTEGER,
+                                    description="clip_id to apply alternating pattern to.",
+                                ),
+                                "interval": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="Seconds between position changes.",
+                                ),
+                                "cycles": types.Schema(
+                                    type=types.Type.INTEGER,
+                                    description="Number of position changes.",
+                                ),
+                            },
+                            required=["clip_id"],
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="pan_to_side",
+                        description="Quickly position audio to a specific side.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "clip_id": types.Schema(
+                                    type=types.Type.INTEGER,
+                                    description="clip_id to position.",
+                                ),
+                                "side": types.Schema(
+                                    type=types.Type.STRING,
+                                    description="Position: 'left', 'right', 'center', 'hard_left', 'hard_right', 'slight_left', 'slight_right'.",
+                                ),
+                            },
+                            required=["clip_id", "side"],
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="stop_panning_patterns",
+                        description="Stop active panning animations for a clip or all clips.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "clip_id": types.Schema(
+                                    type=types.Type.INTEGER,
+                                    description="clip_id to stop patterns for, or omit to stop all patterns.",
+                                ),
+                            },
+                        ),
                     ),
                 ]
             )
@@ -365,10 +440,6 @@ class LLMManager:
             return self.audio_controller.adjust_volume(
                 args.get("audio_type"), args.get("volume"), args.get("clip_id")
             )
-        elif function_name == "pan_audio":
-            return self.audio_controller.pan_audio(
-                args.get("audio_type"), args.get("pan"), args.get("clip_id")
-            )
         elif function_name == "stop_audio":
             return self.audio_controller.stop_audio(args.get("audio_type"))
         elif function_name == "stop_all_audio":
@@ -389,6 +460,24 @@ class LLMManager:
             return self.state_manager.get_context_summary()
         elif function_name == "see_full_progress":
             return self.state_manager.get_full_progress()
+        elif function_name == "pan_pattern_sweep":
+            return self.audio_controller.pan_pattern_sweep(
+                args.get("clip_id"), args.get("direction"), args.get("speed")
+            )
+        elif function_name == "pan_pattern_pendulum":
+            return self.audio_controller.pan_pattern_pendulum(
+                args.get("clip_id"), args.get("cycles"), args.get("duration_per_cycle")
+            )
+        elif function_name == "pan_pattern_alternating":
+            return self.audio_controller.pan_pattern_alternating(
+                args.get("clip_id"), args.get("interval"), args.get("cycles")
+            )
+        elif function_name == "pan_to_side":
+            return self.audio_controller.pan_to_side(
+                args.get("clip_id"), args.get("side")
+            )
+        elif function_name == "stop_panning_patterns":
+            return self.audio_controller.stop_panning_patterns(args.get("clip_id"))
         else:
             return f"Unknown function: {function_name}"
 
