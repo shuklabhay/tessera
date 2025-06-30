@@ -1,4 +1,5 @@
-from threading import Lock
+import time
+from threading import Lock, Thread
 
 import pygame
 
@@ -10,6 +11,7 @@ class AudioMixer:
         pygame.mixer.set_num_channels(num_channels)
         self.channels = [pygame.mixer.Channel(i) for i in range(num_channels)]
         self.lock = Lock()
+        self._orig_volumes = {}
 
     def play(self, sound, channel_idx, loops=0, volume=1.0):
         """Play sound on specified channel."""
@@ -78,3 +80,42 @@ class AudioMixer:
         pygame.mixer.set_num_channels(new_idx + 1)
         self.channels.append(pygame.mixer.Channel(new_idx))
         return new_idx
+
+    def duck_channels(self, enable: bool, factor: float = 0.3, exclude=None):
+        """Duck tracks to help hear spoken tracks."""
+        updated = {}
+
+        # Helper for smooth fade
+        def _fade(idx: int, target: float, duration: float = 0.25, steps: int = 5):
+            start = self.channels[idx].get_volume()
+            step_sleep = duration / steps
+            for s in range(1, steps + 1):
+                interp = start + (target - start) * (s / steps)
+                with self.lock:
+                    self.channels[idx].set_volume(interp)
+                time.sleep(step_sleep)
+
+        threads = []
+
+        if enable:
+            for idx, ch in enumerate(self.channels):
+                if idx in exclude:
+                    continue
+                if idx not in self._orig_volumes:
+                    self._orig_volumes[idx] = ch.get_volume()
+                new_volume = self._orig_volumes[idx] * factor
+                updated[idx] = new_volume
+                t = Thread(target=_fade, args=(idx, new_volume), daemon=True)
+                t.start()
+                threads.append(t)
+        else:
+            for idx, orig_vol in list(self._orig_volumes.items()):
+                if idx in exclude:
+                    continue
+                updated[idx] = orig_vol
+                t = Thread(target=_fade, args=(idx, orig_vol), daemon=True)
+                t.start()
+                threads.append(t)
+                del self._orig_volumes[idx]
+
+        return updated

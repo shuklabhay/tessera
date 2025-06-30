@@ -214,26 +214,29 @@ class AudioController:
         return "Stopped all audio streams."
 
     def duck_background(self, enable: bool, factor: float = 0.3):
-        """Temporarily reduce or restore background clip volumes."""
-        # Exit if the requested state is already set
-        if enable and self._ducked:
-            return
-        if not enable and not self._ducked:
+        """Duck or restore background volumes using the mixer utility."""
+        # Skip if state unchanged
+        if (enable and self._ducked) or (not enable and not self._ducked):
             return
 
-        # Adjust volume across all active clips
+        # Exclude Gemini narration channel from ducking
+        exclude = (
+            [self.channel_map.get("gemini")] if "gemini" in self.channel_map else []
+        )
+
+        # Perform ducking via mixer and get updated volumes
+        updated = self.mixer.duck_channels(enable, factor, exclude=exclude)
+
+        # Sync metadata with new volumes
         for _, meta in self.clips.items():
-            current_channel = meta["channel"]
-            if enable:
-                meta["_orig_volume"] = meta.get("_orig_volume", meta["volume"])
-                new_volume = meta["_orig_volume"] * factor
-                self.mixer.set_volume(current_channel, new_volume)
-                meta["volume"] = new_volume
-            else:
-                if "_orig_volume" in meta:
-                    self.mixer.set_volume(current_channel, meta["_orig_volume"])
-                    meta["volume"] = meta["_orig_volume"]
-                    del meta["_orig_volume"]
+            ch_idx = meta["channel"]
+            if ch_idx in updated:
+                if enable:
+                    meta["_orig_volume"] = meta.get("_orig_volume", meta["volume"])
+                else:
+                    if "_orig_volume" in meta:
+                        del meta["_orig_volume"]
+                meta["volume"] = updated[ch_idx]
 
         self._ducked = enable
 
