@@ -7,9 +7,8 @@ from kivy.uix.floatlayout import FloatLayout
 from ui.audio_visualizer import AudioVisualizer
 from ui.orb import Orb
 
+Window.minimum_width, Window.minimum_height = 202, 360
 Window.size = (405, 720)
-Window.minimum_width = 202
-Window.minimum_height = 360
 Window.resizable = True
 
 

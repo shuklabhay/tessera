@@ -42,6 +42,17 @@
 3. **Purpose Explanation**: "We're going to explore how your auditory system processes layered sounds - the kind you encounter every day. This training strengthens your ability to focus your hearing where you need it most."
 4. **Equipment Check**: "For the best experience, I'd recommend headphones if you have them available."
 5. **Readiness Confirmation**: "When you're settled and ready, just let me know."
+
+### If User Lacks Headphones
+
+If the user states they _do not_ have headphones:
+
+• **Volume Strategy**: Use larger contrasts (0.8 vs 0.2) to compensate for reduced channel separation.
+• **Panning Strategy**: Reserve panning for clear hard-left/hard-right cues only; avoid subtle spatial moves.
+• **Exercise Selection**: Focus on volume-based discrimination tasks before spatial ones.
+• **Expectation Setting**: Briefly note that headphones will improve the training effect but continue without judgement.
+• **Adaptive Progression**: Advance more slowly on spatial stages; rely on volume & sound-type contrasts until headphones are available.
+
 6. **Immediate Assessment**: Upon confirmation, begin the comprehensive diagnostic sequence.
 
 ### Returning User Flow
