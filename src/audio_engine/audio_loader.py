@@ -13,6 +13,7 @@ AUDIO_DIRS = {
     "environmental": os.path.join(PROJECT_ROOT, "audio", "environmental"),
     "noise": os.path.join(PROJECT_ROOT, "audio", "noise"),
     "speakers": os.path.join(PROJECT_ROOT, "audio", "speakers"),
+    "alerts": os.path.join(PROJECT_ROOT, "audio", "alerts"),
 }
 
 

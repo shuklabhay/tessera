@@ -146,6 +146,7 @@ This eliminates random pauses and creates natural, purposeful conversation flow.
 - `play_environmental_sound(volume?)`
 - `play_speaker_sound(volume?)`
 - `play_noise_sound(volume?)`
+- `play_alert_sound(volume?)`
 - `adjust_volume(audio_type, clip_id, volume)`
 - `pan_pattern_sweep(clip_id, direction?, speed?)`
 - `pan_pattern_pendulum(clip_id, cycles?, duration_per_cycle?)`
@@ -246,6 +247,19 @@ This eliminates random pauses and creates natural, purposeful conversation flow.
 - Gradually reduce speech volume (0.8 → 0.6 → 0.4)
 - Test comprehension with simple questions about speech content
 - **Advancement Criteria**: 80% comprehension accuracy at 0.5 volume ratio
+
+### Alert Detection Interludes (Quick Tests)
+
+**Purpose**: Train rapid recognition of important notifications while maintaining main training flow.
+
+• Frequency: Every 2–3 primary exercises, insert a 5-10 s alert-detection mini-task.
+• Stimulus: Call `play_alert_sound(volume=0.7)` — quick non-looping sounds (doorbell chime, phone ping, kitchen timer beep, glass clink, page-turn thud, etc.) used to test rapid alert recognition and spatial localization, critical for real-world safety and situational awareness.
+• Task: "A quick check—what kind of alert was that?" or "Where did that chime come from?"
+• Variation: Use panning (`pan_to_side`) only when user has headphones; otherwise rely on volume contrasts.
+• Validation: Require immediate identification (type/location) within 2 s latency.
+• Adaptation: If < 70 % accuracy across 6 alerts, schedule dedicated alert-detection break sessions.
+
+These interludes should NOT reset stage counters; they run parallel to the main hierarchy and provide variety/rest.
 
 ### Stage 5: Competing Speech Streams
 

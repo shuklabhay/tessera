@@ -312,6 +312,19 @@ class LLMManager:
                             },
                         ),
                     ),
+                    types.FunctionDeclaration(
+                        name="play_alert_sound",
+                        description="Play a random alert/notification sound once (no loop).",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "volume": types.Schema(
+                                    type=types.Type.NUMBER,
+                                    description="Volume from 0.0 to 1.0",
+                                )
+                            },
+                        ),
+                    ),
                 ]
             )
         ]
@@ -478,6 +491,9 @@ class LLMManager:
             )
         elif function_name == "stop_panning_patterns":
             return self.audio_controller.stop_panning_patterns(args.get("clip_id"))
+        elif function_name == "play_alert_sound":
+            volume = args.get("volume", 0.7)
+            return self.audio_controller.play_alert_sound(volume)
         else:
             return f"Unknown function: {function_name}"
 

@@ -145,6 +145,33 @@ class AudioController:
             return {"clip_id": clip_id, "description": description, "type": "noise"}
         return "No noise audio available"
 
+    def play_alert_sound(self, volume=0.7):
+        """Play a random alert sound one-shot (no loop)."""
+        volume = max(0.0, min(MAX_VOLUME, volume))
+        audio, filepath = self.loader.get_cached_audio("alerts")
+        if audio is not None:
+            audio_array = np.ascontiguousarray((audio * 32767).astype(np.int16))
+            sound = pygame.sndarray.make_sound(audio_array)
+
+            channel = self._get_free_non_reserved_channel()
+            if channel is None:
+                return "No free audio channels available"
+
+            self.mixer.play(sound, channel, loops=0, volume=volume)
+
+            description = self._get_audio_description(filepath)
+            clip_id = self._next_clip_id
+            self._next_clip_id += 1
+            self.clips[clip_id] = {
+                "type": "alerts",
+                "channel": channel,
+                "volume": volume,
+                "pan": 0.0,
+                "description": description,
+            }
+            return {"clip_id": clip_id, "description": description, "type": "alerts"}
+        return "No alert sounds available"
+
     def pan_audio(self, audio_type, pan, clip_id=None):
         """Pan an audio source left or right. If clip_id given, target that clip only."""
         pan = max(-1.0, min(1.0, pan))
