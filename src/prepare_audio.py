@@ -14,7 +14,6 @@ PROMPT_PATH = SRC_DIR / "prompts" / "audio_labeling_prompt.md"
 TMP_SUFFIX = ".tmp_normalised.wav"
 PROMPT_TEXT = (SRC_DIR / "prompts" / "audio_labeling_prompt.md").read_text()
 
-# Initialise Gemini client and config once
 _CLIENT = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 _MODEL_NAME = "gemini-2.5-flash"
 _CONTENT_CONFIG = types.GenerateContentConfig(

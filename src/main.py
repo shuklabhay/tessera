@@ -3,6 +3,7 @@ from ui.main_app import UnlockHearingApp
 
 
 def main():
+    """Launch the Unlock Hearing application."""
     llm_manager = LLMManager()
     app = UnlockHearingApp(llm_manager=llm_manager)
     app.run()

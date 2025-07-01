@@ -280,8 +280,8 @@ class AudioController:
 
         self._ducked = enable
 
-    # Internal util
     def _get_free_non_reserved_channel(self):
+        """Return a free mixer channel that is not reserved."""
         reserved = set(self.channel_map.values())
         for idx in range(len(self.mixer.channels)):
             if idx in reserved:
@@ -290,7 +290,6 @@ class AudioController:
                 return idx
         return None
 
-    # Advanced Panning Pattern Methods
     def _stop_panning_thread(self, clip_id):
         """Stop any active panning animation for a clip."""
         if clip_id in self._panning_threads:
