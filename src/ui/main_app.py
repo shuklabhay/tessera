@@ -65,11 +65,11 @@ class MainLayout(FloatLayout):
             self.orb.update_from_amplitude(amplitude * 1.5)
 
 
-class UnlockHearingApp(App):
+class TesseraApp(App):
     def __init__(self, llm_manager=None, **kwargs):
         self.llm_manager = llm_manager
-        super(UnlockHearingApp, self).__init__(**kwargs)
-        self.title = "Unlock Hearing"
+        super(TesseraApp, self).__init__(**kwargs)
+        self.title = "Tessera"
 
     def build(self):
         """Build and return the main layout."""

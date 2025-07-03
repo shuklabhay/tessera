@@ -8,18 +8,22 @@ class StateManager:
         repo_root = Path(__file__).resolve().parents[2]
         self.progress_file = (repo_root / progress_file).resolve()
 
-        self._ensure_progress_file_exists()
-
-    def _ensure_progress_file_exists(self):
-        """Create a blank progress file if one does not exist."""
-        if not self.progress_file.exists():
-            self.progress_file.parent.mkdir(parents=True, exist_ok=True)
-            self._write_state({"sessions": []})
-
     def _read_state(self) -> dict:
-        """Return persisted state, falling back to an empty schema if file is missing or malformed."""
-        with self.progress_file.open("r", encoding="utf-8") as f:
-            return json.load(f)
+        """Return persisted state or initialise blank structure when file is empty/missing."""
+        if not self.progress_file.exists():
+            default_state = {"sessions": []}
+            self._write_state(default_state)
+            return default_state
+
+        content = self.progress_file.read_text(encoding="utf-8").strip()
+
+        # Initialise blank state when file is empty
+        if not content:
+            default_state = {"sessions": []}
+            self._write_state(default_state)
+            return default_state
+
+        return json.loads(content)
 
     def _write_state(self, state: dict):
         """Persist the current state to disk."""

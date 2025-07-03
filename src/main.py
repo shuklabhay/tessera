@@ -1,11 +1,11 @@
 from managers.llm_manager import LLMManager
-from ui.main_app import UnlockHearingApp
+from ui.main_app import TesseraApp
 
 
 def main():
-    """Launch the Unlock Hearing application."""
+    """Launch the Tessera application."""
     llm_manager = LLMManager()
-    app = UnlockHearingApp(llm_manager=llm_manager)
+    app = TesseraApp(llm_manager=llm_manager)
     app.run()
 
 
