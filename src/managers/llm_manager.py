@@ -311,20 +311,6 @@ class LLMManager:
                             },
                         ),
                     ),
-                    types.FunctionDeclaration(
-                        name="set_headphones_available",
-                        description="Record whether the user currently has headphones available.",
-                        parameters=types.Schema(
-                            type=types.Type.OBJECT,
-                            properties={
-                                "available": types.Schema(
-                                    type=types.Type.BOOLEAN,
-                                    description="True if the user confirms they are wearing or have headphones; False otherwise.",
-                                )
-                            },
-                            required=["available"],
-                        ),
-                    ),
                 ]
             )
         ]
@@ -489,13 +475,7 @@ class LLMManager:
         elif function_name == "play_alert_sound":
             volume = args.get("volume", 0.7)
             return self.audio_controller.play_alert_sound(volume)
-        elif function_name == "set_headphones_available":
-            available = args.get("available")
-            if available is not None:
-                return self.state_manager.update_field(
-                    "headphones_available", bool(available)
-                )
-            return "Error: available flag not provided."
+
         else:
             return f"Unknown function: {function_name}"
 
@@ -533,7 +513,7 @@ class LLMManager:
                             )
                         )
 
-                    # Send all responses together (Live API infers turn completion)
+                    # Send all responses together
                     await self.session.send_tool_response(
                         function_responses=function_responses
                     )

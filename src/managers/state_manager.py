@@ -50,8 +50,6 @@ class StateManager:
         """Return a compact string summary for prompt injection."""
         state = self._read_state()
         lines = []
-        if state.get("name"):
-            lines.append(f"USER NAME: {state['name']}")
         for sess in state.get("sessions", [])[-5:]:
             lines.append(f"Session {sess['date']}:")
             for obs in sess["observations"][-5:]:
@@ -61,14 +59,6 @@ class StateManager:
     def get_full_progress(self) -> str:
         """Return the complete progress JSON as a formatted string."""
         return json.dumps(self._read_state(), indent=2)
-
-    def set_user_name(self, name: str, pronunciation: str | None = None):
-        """Set the user's name and optional pronunciation."""
-        state = self._read_state()
-        state["name"] = name
-        if pronunciation:
-            state["pronunciation"] = pronunciation
-        self._write_state(state)
 
     def update_field(self, field: str, value):
         """Update any top-level field and persist immediately."""

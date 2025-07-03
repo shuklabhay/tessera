@@ -13,13 +13,19 @@ MAX_VOLUME = 0.8
 
 class AudioController:
     def __init__(self):
-        pygame.mixer.quit()
-        pygame.mixer.init(frequency=24000, size=-16, channels=2, buffer=512)
+        if pygame.mixer.get_init():
+            pygame.mixer.quit()
+
+        pygame.mixer.pre_init(
+            frequency=24000, size=-16, channels=2, buffer=512, allowedchanges=0
+        )
+        pygame.mixer.init()
+
         self.loader = AudioLoader()
         self.mixer = AudioMixer()
         self.clips = {}
         self._next_clip_id = 1
-        self.channel_map = {"gemini": 7}
+        self.channel_map = {"gemini": 0}
         self._ducked = False
         self._panning_threads = {}
 
