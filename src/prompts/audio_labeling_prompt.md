@@ -22,13 +22,3 @@ Follow these rules strictly:
 **Example of a good description:**
 
 "A calm male voice says, 'Welcome to the morning news,' with a slight upward inflection on the last word, followed by a brief pause. A constant, low-level hiss of air conditioning is audible in the background, along with the faint sound of paper rustling to one side. The recording sounds very clear and close, as if in a small studio with little to no echo."
-
----
-
-### Why This Optimized Prompt Works Better:
-
-1.  **Removes Hallucination Triggers:** It explicitly forbids guessing at technical specs (`Hz`, `BPM`, `seconds`), which is the primary source of your "slop."
-2.  **Reframes the Task:** It changes the goal from "be a machine" to "describe like a human." By providing descriptive alternatives ("crisp, fast-repeating hi-hat"), it guides the model toward the right kind of language.
-3.  **Sets Realistic Expectations:** The instructions and the example are now perfectly aligned. The example demonstrates exactly what is asked for: descriptive language without fabricated data.
-4.  **Establishes a "Golden Rule":** Creating a single, emphasized rule about factual accuracy and anti-hallucination acts as a powerful constraint that the model will prioritize.
-5.  **Softer Language:** It replaces absolute demands like "name every distinct element" with more practical instructions like "identify key sounds" and "name the most prominent sonic elements," giving the model flexibility to focus on what's actually important in the clip.

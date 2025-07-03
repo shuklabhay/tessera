@@ -178,20 +178,6 @@ class LLMManager:
                         parameters=types.Schema(type=types.Type.OBJECT),
                     ),
                     types.FunctionDeclaration(
-                        name="set_pronunciation",
-                        description="Save how the user's name should be pronounced. Call exactly once after they say their name.",
-                        parameters=types.Schema(
-                            type=types.Type.OBJECT,
-                            properties={
-                                "pronunciation": types.Schema(
-                                    type=types.Type.STRING,
-                                    description="Pronunciation text Kai should use for addressing the user.",
-                                )
-                            },
-                            required=["pronunciation"],
-                        ),
-                    ),
-                    types.FunctionDeclaration(
                         name="add_session_observation",
                         description="Append a short JSON-compatible summary of the latest session observation to progress log.",
                         parameters=types.Schema(
@@ -323,6 +309,20 @@ class LLMManager:
                                     description="Volume from 0.0 to 1.0",
                                 )
                             },
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="set_headphones_available",
+                        description="Record whether the user currently has headphones available.",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "available": types.Schema(
+                                    type=types.Type.BOOLEAN,
+                                    description="True if the user confirms they are wearing or have headphones; False otherwise.",
+                                )
+                            },
+                            required=["available"],
                         ),
                     ),
                 ]
@@ -459,11 +459,6 @@ class LLMManager:
             return self.audio_controller.stop_all_audio()
         elif function_name == "get_status":
             return self.audio_controller.get_status()
-        elif function_name == "set_pronunciation":
-            pron = args.get("pronunciation")
-            if pron:
-                return self.state_manager.update_field("pronunciation", pron)
-            return "Error: pronunciation not provided."
         elif function_name == "add_session_observation":
             summary = args.get("summary")
             if summary:
@@ -494,6 +489,13 @@ class LLMManager:
         elif function_name == "play_alert_sound":
             volume = args.get("volume", 0.7)
             return self.audio_controller.play_alert_sound(volume)
+        elif function_name == "set_headphones_available":
+            available = args.get("available")
+            if available is not None:
+                return self.state_manager.update_field(
+                    "headphones_available", bool(available)
+                )
+            return "Error: available flag not provided."
         else:
             return f"Unknown function: {function_name}"
 

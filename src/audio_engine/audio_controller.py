@@ -13,8 +13,8 @@ MAX_VOLUME = 0.8
 
 class AudioController:
     def __init__(self):
-        pygame.mixer.pre_init(frequency=24000, size=-16, channels=2, buffer=512)
-        pygame.mixer.init()
+        pygame.mixer.quit()
+        pygame.mixer.init(frequency=24000, size=-16, channels=2, buffer=512)
         self.loader = AudioLoader()
         self.mixer = AudioMixer()
         self.clips = {}
@@ -32,7 +32,7 @@ class AudioController:
         mono_array = np.frombuffer(audio_chunk_bytes, dtype=np.int16)
 
         # Convert mono to stereo
-        stereo_array = np.column_stack([mono_array, mono_array])
+        stereo_array = np.ascontiguousarray(np.column_stack([mono_array, mono_array]))
 
         # Create and queue sound
         sound_chunk = pygame.sndarray.make_sound(stereo_array)
