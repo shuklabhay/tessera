@@ -1,3 +1,5 @@
+from typing import Any, Optional
+
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.core.window import Window
@@ -13,7 +15,7 @@ Window.resizable = True
 
 
 class MainLayout(FloatLayout):
-    def __init__(self, llm_manager=None, **kwargs):
+    def __init__(self, llm_manager: Optional[Any] = None, **kwargs) -> None:
         super(MainLayout, self).__init__(**kwargs)
         with self.canvas.before:
             Color(0, 0, 0, 1)  #
@@ -35,7 +37,7 @@ class MainLayout(FloatLayout):
         if self.llm_manager:
             Clock.schedule_once(self.start_llm_manager, 1)
 
-    def _update_bg(self, instance, value):
+    def _update_bg(self, instance: Any, value: Any) -> None:
         """Update background and orb size when window resizes."""
         # Update background rectangle
         self.bg.pos = instance.pos
@@ -46,13 +48,13 @@ class MainLayout(FloatLayout):
             self.orb.base_radius = min(Window.width, Window.height) / 6
             self.orb.glow_radius = self.orb.base_radius * 1.1
 
-    def start_llm_manager(self, dt):
+    def start_llm_manager(self, dt: float) -> None:
         """Start the LLM manager on the main thread."""
         if self.llm_manager:
             print("🎬 Starting LLM Manager from UI...", flush=True)
             self.llm_manager.start()
 
-    def update_orb_from_audio(self, dt):
+    def update_orb_from_audio(self, dt: float) -> None:
         """Update orb visualization based on latest audio data."""
         if not self.llm_manager or not self.llm_manager.viz_queue:
             self.orb.start_idle_animation(delay=0.5)
@@ -66,16 +68,16 @@ class MainLayout(FloatLayout):
 
 
 class TesseraApp(App):
-    def __init__(self, llm_manager=None, **kwargs):
+    def __init__(self, llm_manager: Optional[Any] = None, **kwargs) -> None:
         self.llm_manager = llm_manager
         super(TesseraApp, self).__init__(**kwargs)
         self.title = "Tessera"
 
-    def build(self):
+    def build(self) -> MainLayout:
         """Build and return the main layout."""
         return MainLayout(llm_manager=self.llm_manager)
 
-    def on_stop(self):
+    def on_stop(self) -> bool:
         """Clean up when app closes."""
         self.llm_manager.stop()
         return True

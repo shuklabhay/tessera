@@ -2,6 +2,7 @@ import os
 import pathlib
 import shutil
 import subprocess
+from typing import Iterator
 
 from google import genai
 from google.genai import types
@@ -22,7 +23,7 @@ _CONTENT_CONFIG = types.GenerateContentConfig(
 )
 
 
-def _find_audio_files():
+def _find_audio_files() -> Iterator[pathlib.Path]:
     """Yield absolute file paths for supported audio under AUDIO_DIR."""
     for path in AUDIO_DIR.rglob("*"):
         if path.suffix.lower() in AUDIO_EXTENSIONS and path.is_file():

@@ -4,6 +4,7 @@ import ssl
 import threading
 import time as time_module
 import traceback
+from typing import Any, Dict, List, Optional, Union
 
 import certifi
 import numpy as np
@@ -32,7 +33,7 @@ client = genai.Client(
 )
 
 
-def load_system_prompt():
+def load_system_prompt() -> str:
     prompt_path = os.path.join(
         os.path.dirname(__file__), "..", "prompts", "system_prompt.md"
     )
@@ -41,7 +42,7 @@ def load_system_prompt():
 
 
 class LLMManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self.audio_in_queue = asyncio.Queue()
         self.out_queue = asyncio.Queue()
         self.viz_queue = []
@@ -65,14 +66,14 @@ class LLMManager:
         self.loop = None
         self.thread = None
 
-    def _get_contextual_system_prompt(self):
+    def _get_contextual_system_prompt(self) -> str:
         base_prompt = load_system_prompt()
         context_summary = self.state_manager.get_context_summary()
         if context_summary:
             return f"{base_prompt}\n\n---\n\n## Current Session Context\n\n{context_summary}"
         return base_prompt
 
-    def _determine_startup_phase(self):
+    def _determine_startup_phase(self) -> str:
         """Return startup phase keyword based on persisted state."""
         state = self.state_manager._read_state()
 
@@ -89,7 +90,7 @@ class LLMManager:
         self.state_manager.update_progress(new_observation)
         return "Progress successfully logged."
 
-    def get_tools(self):
+    def get_tools(self) -> List[types.Tool]:
         return [
             types.Tool(
                 function_declarations=[
@@ -315,7 +316,7 @@ class LLMManager:
             )
         ]
 
-    def get_live_config(self):
+    def get_live_config(self) -> types.LiveConnectConfig:
         return types.LiveConnectConfig(
             response_modalities=["AUDIO"],
             speech_config=types.SpeechConfig(
@@ -332,7 +333,9 @@ class LLMManager:
             system_instruction=self.system_prompt,
         )
 
-    def audio_callback(self, indata, frames, time, status):
+    def audio_callback(
+        self, indata: np.ndarray, frames: int, time: Any, status: Any
+    ) -> None:
         # Don't process input when Gemini is speaking to avoid audio feedback loop
         if not self.running or self.gemini_speaking:
             return
@@ -381,7 +384,7 @@ class LLMManager:
             # Reset silence timer if any non-silent activity detected.
             self.silence_start_time = None
 
-    async def listen_audio(self):
+    async def listen_audio(self) -> None:
         self.recording = False
         self.last_voice_detected = time_module.time()
 
@@ -401,7 +404,7 @@ class LLMManager:
         self.input_stream.stop()
         self.input_stream.close()
 
-    async def send_audio(self):
+    async def send_audio(self) -> None:
         chunk_sent = False
         while self.running:
             audio_chunk = await self.audio_in_queue.get()
@@ -422,7 +425,7 @@ class LLMManager:
                     await self.session.send_realtime_input(audio_stream_end=True)
                 chunk_sent = False
 
-    def execute_function(self, function_call):
+    def execute_function(self, function_call: Any) -> Union[str, Dict[str, Any]]:
         function_name = function_call.name
         args = function_call.args if hasattr(function_call, "args") else {}
 
@@ -479,7 +482,7 @@ class LLMManager:
         else:
             return f"Unknown function: {function_name}"
 
-    async def receive_and_process_responses(self):
+    async def receive_and_process_responses(self) -> None:
         while self.running:
             has_audio_in_turn = False
             turn = self.session.receive()
@@ -532,7 +535,7 @@ class LLMManager:
             if has_audio_in_turn:
                 self.turn_ended.set()
 
-    async def play_audio(self):
+    async def play_audio(self) -> None:
         self.output_stream = sd.OutputStream(
             samplerate=RECEIVE_SAMPLE_RATE, channels=CHANNELS, dtype=np.int16
         )
@@ -549,7 +552,7 @@ class LLMManager:
         self.output_stream.stop()
         self.output_stream.close()
 
-    async def manage_speaking_state(self):
+    async def manage_speaking_state(self) -> None:
         while self.running:
             await self.turn_ended.wait()
             await self.out_queue.join()
@@ -560,7 +563,7 @@ class LLMManager:
                 self._log_intro_pending = False
             self.turn_ended.clear()
 
-    async def _send_initial_prompt(self):
+    async def _send_initial_prompt(self) -> None:
         # Choose initial user message based on startup phase
         if self.startup_phase == "intro":
             text = "Initialize introduction phase for new user."
@@ -575,7 +578,7 @@ class LLMManager:
             turn_complete=True,
         )
 
-    async def run_async(self):
+    async def run_async(self) -> None:
         self.running = True
         async with client.aio.live.connect(
             model=MODEL, config=self.get_live_config()
@@ -596,13 +599,13 @@ class LLMManager:
             await asyncio.gather(*tasks)
         self.stop()
 
-    def run_in_thread(self):
+    def run_in_thread(self) -> None:
         """Run the async event loop in a separate thread"""
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         self.loop.run_until_complete(self.run_async())
 
-    def start(self):
+    def start(self) -> bool:
         self.running = True
 
         # Start the async code in a separate thread
@@ -610,7 +613,7 @@ class LLMManager:
         self.thread.start()
         return True
 
-    def stop(self):
+    def stop(self) -> None:
         self.running = False
 
         if self.input_stream:

@@ -1,6 +1,7 @@
 import os
 import threading
 import time
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pygame
@@ -12,7 +13,7 @@ MAX_VOLUME = 0.8
 
 
 class AudioController:
-    def __init__(self):
+    def __init__(self) -> None:
         if pygame.mixer.get_init():
             pygame.mixer.quit()
 
@@ -29,7 +30,7 @@ class AudioController:
         self._ducked = False
         self._panning_threads = {}
 
-    def play_gemini_chunk(self, audio_chunk_bytes):
+    def play_gemini_chunk(self, audio_chunk_bytes: bytes) -> None:
         """Play raw audio chunk from Gemini as stereo sound."""
         if not audio_chunk_bytes:
             return
@@ -44,7 +45,7 @@ class AudioController:
         sound_chunk = pygame.sndarray.make_sound(stereo_array)
         self.mixer.queue_sound(self.channel_map["gemini"], sound_chunk)
 
-    def _get_audio_description(self, filepath):
+    def _get_audio_description(self, filepath: str) -> str:
         """Get description from companion .txt file if it exists."""
         if not filepath:
             return "No description available."
@@ -60,7 +61,9 @@ class AudioController:
                 return f.read().strip()
         return "No description available."
 
-    def play_environmental_sound(self, volume=0.7):
+    def play_environmental_sound(
+        self, volume: float = 0.7
+    ) -> Union[str, Dict[str, Any]]:
         """Play a random environmental soundscape on loop."""
         volume = max(0.0, min(MAX_VOLUME, volume))
         audio, filepath = self.loader.get_cached_audio("environmental")
@@ -93,7 +96,7 @@ class AudioController:
             }
         return "No environmental sounds available"
 
-    def play_speaker_sound(self, volume=0.7):
+    def play_speaker_sound(self, volume: float = 0.7) -> Union[str, Dict[str, Any]]:
         """Play a random person speaking audio on loop."""
         volume = max(0.0, min(MAX_VOLUME, volume))
         audio, filepath = self.loader.get_cached_audio("speakers")
@@ -122,7 +125,7 @@ class AudioController:
             return {"clip_id": clip_id, "description": description, "type": "speakers"}
         return "No speaker audio available"
 
-    def play_noise_sound(self, volume=0.7):
+    def play_noise_sound(self, volume: float = 0.7) -> Union[str, Dict[str, Any]]:
         """Play a random noise sound on loop."""
         volume = max(0.0, min(MAX_VOLUME, volume))
         audio, filepath = self.loader.get_cached_audio("noise")
@@ -151,7 +154,7 @@ class AudioController:
             return {"clip_id": clip_id, "description": description, "type": "noise"}
         return "No noise audio available"
 
-    def play_alert_sound(self, volume=0.7):
+    def play_alert_sound(self, volume: float = 0.7) -> Union[str, Dict[str, Any]]:
         """Play a random alert sound one-shot (no loop)."""
         volume = max(0.0, min(MAX_VOLUME, volume))
         audio, filepath = self.loader.get_cached_audio("alerts")
@@ -178,7 +181,12 @@ class AudioController:
             return {"clip_id": clip_id, "description": description, "type": "alerts"}
         return "No alert sounds available"
 
-    def pan_audio(self, audio_type, pan, clip_id=None):
+    def pan_audio(
+        self,
+        audio_type: Optional[str],
+        pan: float,
+        clip_id: Optional[Union[str, int]] = None,
+    ) -> str:
         """Pan an audio source left or right. If clip_id given, target that clip only."""
         pan = max(-1.0, min(1.0, pan))
 
@@ -197,7 +205,12 @@ class AudioController:
         clip["pan"] = pan
         return f"Panned clip {cid_int} to {pan}."
 
-    def adjust_volume(self, audio_type, volume, clip_id=None):
+    def adjust_volume(
+        self,
+        audio_type: Optional[str],
+        volume: float,
+        clip_id: Optional[Union[str, int]] = None,
+    ) -> str:
         """Adjust volume globally for type or for specific clip."""
         volume = max(0.0, min(1.0, volume))
         volume = min(MAX_VOLUME, volume)
@@ -217,7 +230,7 @@ class AudioController:
         clip["volume"] = volume
         return f"Volume for clip {cid_int} set to {int(volume*100)}%"
 
-    def stop_audio(self, audio_type=None):
+    def stop_audio(self, audio_type: Optional[str] = None) -> str:
         """Stop a specific audio type or all audio if none specified."""
         if audio_type and not audio_type == "clip":
             to_remove = [
@@ -234,7 +247,7 @@ class AudioController:
             return self.stop_all_audio()
         return f"No active {audio_type} stream to stop"
 
-    def get_status(self):
+    def get_status(self) -> List[Dict[str, Any]]:
         """Get current audio playback status."""
         if not self.clips:
             return []
@@ -249,7 +262,7 @@ class AudioController:
             for cid, meta in self.clips.items()
         ]
 
-    def stop_all_audio(self):
+    def stop_all_audio(self) -> str:
         """Stop all active audio streams."""
         # Stop all panning patterns first
         for cid in list(self._panning_threads.keys()):
@@ -259,7 +272,7 @@ class AudioController:
         self.clips.clear()
         return "Stopped all audio streams."
 
-    def duck_background(self, enable: bool, factor: float = 0.3):
+    def duck_background(self, enable: bool, factor: float = 0.3) -> None:
         """Duck or restore background volumes using the mixer utility."""
         # Skip if state unchanged
         if (enable and self._ducked) or (not enable and not self._ducked):
@@ -286,7 +299,7 @@ class AudioController:
 
         self._ducked = enable
 
-    def _get_free_non_reserved_channel(self):
+    def _get_free_non_reserved_channel(self) -> Optional[int]:
         """Return a free mixer channel that is not reserved."""
         reserved = set(self.channel_map.values())
         for idx in range(len(self.mixer.channels)):
@@ -296,7 +309,7 @@ class AudioController:
                 return idx
         return None
 
-    def _stop_panning_thread(self, clip_id):
+    def _stop_panning_thread(self, clip_id: int) -> None:
         """Stop any active panning animation for a clip."""
         if clip_id in self._panning_threads:
             self._panning_threads[clip_id]["stop"] = True
@@ -304,8 +317,13 @@ class AudioController:
             del self._panning_threads[clip_id]
 
     def _smooth_pan_transition(
-        self, clip_id, start_pan, end_pan, duration_seconds, steps=20
-    ):
+        self,
+        clip_id: int,
+        start_pan: float,
+        end_pan: float,
+        duration_seconds: float,
+        steps: int = 20,
+    ) -> None:
         """Smoothly transition pan position over time."""
         clip = self.clips.get(clip_id)
         if not clip:
@@ -329,7 +347,12 @@ class AudioController:
             if step < steps:  # Don't sleep on last iteration
                 time.sleep(sleep_time)
 
-    def pan_pattern_sweep(self, clip_id, direction="left_to_right", speed="moderate"):
+    def pan_pattern_sweep(
+        self,
+        clip_id: Union[str, int],
+        direction: str = "left_to_right",
+        speed: Union[str, float] = "moderate",
+    ) -> str:
         """Sweep audio across stereo field."""
         try:
             cid_int = int(clip_id)
@@ -376,7 +399,9 @@ class AudioController:
 
         return f"Started {direction} sweep for clip {cid_int} over {duration}s"
 
-    def pan_pattern_pendulum(self, clip_id, cycles=3, duration_per_cycle=3.0):
+    def pan_pattern_pendulum(
+        self, clip_id: Union[str, int], cycles: int = 3, duration_per_cycle: float = 3.0
+    ) -> str:
         """Create pendulum back-and-forth panning motion."""
         try:
             cid_int = int(clip_id)
@@ -389,7 +414,7 @@ class AudioController:
         # Stop any existing panning
         self._stop_panning_thread(cid_int)
 
-        def pendulum_motion():
+        def pendulum_motion() -> None:
             clip = self.clips.get(cid_int)
             if not clip:
                 return
@@ -431,7 +456,9 @@ class AudioController:
 
         return f"Started pendulum motion for clip {cid_int} - {cycles} cycles"
 
-    def pan_pattern_alternating(self, clip_id, interval=2.0, cycles=5):
+    def pan_pattern_alternating(
+        self, clip_id: Union[str, int], interval: float = 2.0, cycles: int = 5
+    ) -> str:
         """Alternate between left and right positions."""
         try:
             cid_int = int(clip_id)
@@ -444,7 +471,7 @@ class AudioController:
         # Stop any existing panning
         self._stop_panning_thread(cid_int)
 
-        def alternating_motion():
+        def alternating_motion() -> None:
             clip = self.clips.get(cid_int)
             if not clip:
                 return
@@ -471,7 +498,7 @@ class AudioController:
 
         return f"Started alternating pattern for clip {cid_int} - {cycles} cycles at {interval}s intervals"
 
-    def pan_to_side(self, clip_id, side):
+    def pan_to_side(self, clip_id: Union[str, int], side: str) -> str:
         """Quickly pan audio to specified side."""
         try:
             cid_int = int(clip_id)
@@ -499,7 +526,7 @@ class AudioController:
 
         return self.pan_audio(None, pan, cid_int)
 
-    def stop_panning_patterns(self, clip_id=None):
+    def stop_panning_patterns(self, clip_id: Optional[Union[str, int]] = None) -> str:
         """Stop panning patterns for specific clip or all clips."""
         if clip_id is not None:
             try:

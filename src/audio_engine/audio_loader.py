@@ -1,6 +1,7 @@
 import os
 import random
 from threading import Lock, Thread
+from typing import List, Optional, Tuple
 
 import numpy as np
 import soundfile as sf
@@ -18,10 +19,10 @@ AUDIO_DIRS = {
 
 
 class AudioLoader:
-    def __init__(self):
+    def __init__(self) -> None:
         self.paths = AUDIO_DIRS
 
-    def _scan_files(self, category):
+    def _scan_files(self, category: str) -> List[str]:
         """Scan directory for audio files in the given category."""
         path = self.paths.get(category)
         if not path:
@@ -43,14 +44,14 @@ class AudioLoader:
         )
         return files
 
-    def get_random_file(self, category):
+    def get_random_file(self, category: str) -> Optional[str]:
         """Get a random audio file path from the specified category."""
         files = self._scan_files(category)
         if not files:
             return None
         return random.choice(files)
 
-    def load_audio(self, filepath):
+    def load_audio(self, filepath: str) -> np.ndarray:
         """Load and process audio file to 24kHz stereo format."""
         # Load audio data
         data, sample_rate = sf.read(filepath, dtype="float32")
@@ -94,7 +95,9 @@ class AudioLoader:
 
         return data
 
-    def get_random_audio(self, category):
+    def get_random_audio(
+        self, category: str
+    ) -> Tuple[Optional[np.ndarray], Optional[str]]:
         """Get a random loaded audio file and its path from the specified category."""
         filepath = self.get_random_file(category)
         if not filepath:
@@ -102,14 +105,16 @@ class AudioLoader:
         audio = self.load_audio(filepath)
         return audio, filepath
 
-    def get_cached_audio(self, category):
+    def get_cached_audio(
+        self, category: str
+    ) -> Tuple[Optional[np.ndarray], Optional[str]]:
         """Return freshly loaded random audio (no caching)."""
         audio, filepath = self.get_random_audio(category)
         if audio is not None:
             audio = self._normalize_audio(audio)
         return audio, filepath
 
-    def _normalize_audio(self, audio):
+    def _normalize_audio(self, audio: np.ndarray) -> np.ndarray:
         """Normalize audio to [-1, 1] range."""
         if audio is None:
             return None

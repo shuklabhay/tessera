@@ -2,7 +2,7 @@ from managers.llm_manager import LLMManager
 from ui.main_app import TesseraApp
 
 
-def main():
+def main() -> None:
     """Launch the Tessera application."""
     llm_manager = LLMManager()
     app = TesseraApp(llm_manager=llm_manager)

@@ -1,3 +1,5 @@
+from typing import Any
+
 from kivy.animation import Animation
 from kivy.clock import Clock
 from kivy.graphics import Color, Ellipse, InstructionGroup
@@ -12,7 +14,7 @@ class Orb(Widget):
     orb_color = ColorProperty([1, 1, 1, 1])
     glow_color = ColorProperty([1, 1, 1, 0.3])
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super(Orb, self).__init__(**kwargs)
         self.canvas.clear()
 
@@ -28,7 +30,7 @@ class Orb(Widget):
         self.idle_anim = None
         self.start_idle_animation()
 
-    def update_graphics(self, dt):
+    def update_graphics(self, dt: float) -> None:
         """Update orb position and size for current frame."""
         # Calculate sizes based on radius and multiplier
         orb_size = self.base_radius * 2 * self.size_multiplier
@@ -44,7 +46,7 @@ class Orb(Widget):
         self.glow.pos = glow_pos
         self.glow.size = (glow_size, glow_size)
 
-    def update_from_amplitude(self, amplitude):
+    def update_from_amplitude(self, amplitude: float) -> None:
         """Update orb size based on audio amplitude."""
         # Cancel any existing animation
         if self.anim is not None:
@@ -65,7 +67,7 @@ class Orb(Widget):
         if amplitude > 0.05:
             self.start_idle_animation(delay=1.5)
 
-    def start_idle_animation(self, delay=0):
+    def start_idle_animation(self, delay: float = 0) -> None:
         """Start subtle pulsing idle animation after delay."""
         # Cancel any existing idle animation
         if self.idle_anim is not None:
@@ -74,7 +76,7 @@ class Orb(Widget):
         # Schedule idle animation to start
         Clock.schedule_once(self._begin_idle_animation, delay)
 
-    def _begin_idle_animation(self, dt):
+    def _begin_idle_animation(self, dt: float) -> None:
         """Set up and start the breathing idle animation."""
         # Breathing effect parameters
         idle_size_min = 0.97
@@ -94,7 +96,7 @@ class Orb(Widget):
         self.idle_anim.repeat = True
         self.idle_anim.start(self)
 
-    def on_touch_down(self, touch):
+    def on_touch_down(self, touch: Any) -> bool:
         """Handle touch events with pulse animation."""
         if self.collide_point(*touch.pos):
             # Cancel all animations

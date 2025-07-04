@@ -1,11 +1,12 @@
 import time
 from threading import Lock, Thread
+from typing import Dict, List, Optional
 
 import pygame
 
 
 class AudioMixer:
-    def __init__(self, num_channels=8):
+    def __init__(self, num_channels: int = 8) -> None:
         if not pygame.mixer.get_init():
             pygame.mixer.init()
         pygame.mixer.set_num_channels(num_channels)
@@ -13,14 +14,20 @@ class AudioMixer:
         self.lock = Lock()
         self._orig_volumes = {}
 
-    def play(self, sound, channel_idx, loops=0, volume=1.0):
+    def play(
+        self,
+        sound: pygame.mixer.Sound,
+        channel_idx: int,
+        loops: int = 0,
+        volume: float = 1.0,
+    ) -> None:
         """Play sound on specified channel."""
         with self.lock:
             ch = self.channels[channel_idx]
             ch.set_volume(volume)
             ch.play(sound, loops=loops)
 
-    def queue_sound(self, channel_idx, sound):
+    def queue_sound(self, channel_idx: int, sound: pygame.mixer.Sound) -> None:
         """Queue sound on channel or play immediately if channel is free."""
         with self.lock:
             ch = self.channels[channel_idx]
@@ -29,19 +36,19 @@ class AudioMixer:
             else:
                 ch.queue(sound)
 
-    def stop(self, channel_idx):
+    def stop(self, channel_idx: int) -> None:
         """Stop playback on specified channel."""
         with self.lock:
             if channel_idx < len(self.channels):
                 self.channels[channel_idx].stop()
 
-    def set_volume(self, channel_idx, volume):
+    def set_volume(self, channel_idx: int, volume: float) -> None:
         """Set volume for specified channel."""
         with self.lock:
             if channel_idx < len(self.channels):
                 self.channels[channel_idx].set_volume(volume)
 
-    def set_pan(self, channel_idx, pan):
+    def set_pan(self, channel_idx: int, pan: float) -> None:
         """Set stereo panning for specified channel."""
         with self.lock:
             if channel_idx < len(self.channels):
@@ -57,19 +64,19 @@ class AudioMixer:
                     current_volume * left_multiplier, current_volume * right_multiplier
                 )
 
-    def is_playing(self, channel_idx):
+    def is_playing(self, channel_idx: int) -> bool:
         """Check if specified channel is currently playing."""
         if channel_idx < len(self.channels):
             return self.channels[channel_idx].get_busy()
         return False
 
-    def stop_all(self):
+    def stop_all(self) -> None:
         """Stop playback on all channels."""
         with self.lock:
             for ch in self.channels:
                 ch.stop()
 
-    def get_free_channel_index(self):
+    def get_free_channel_index(self) -> int:
         """Return index of first free channel, or None if all busy."""
         for idx, ch in enumerate(self.channels):
             if not ch.get_busy():
@@ -81,12 +88,16 @@ class AudioMixer:
         self.channels.append(pygame.mixer.Channel(new_idx))
         return new_idx
 
-    def duck_channels(self, enable: bool, factor: float = 0.3, exclude=None):
+    def duck_channels(
+        self, enable: bool, factor: float = 0.3, exclude: Optional[List[int]] = None
+    ) -> Dict[int, float]:
         """Duck tracks to help hear spoken tracks."""
         updated = {}
 
         # Helper for smooth fade
-        def _fade(idx: int, target: float, duration: float = 0.25, steps: int = 5):
+        def _fade(
+            idx: int, target: float, duration: float = 0.25, steps: int = 5
+        ) -> None:
             start = self.channels[idx].get_volume()
             step_sleep = duration / steps
             for s in range(1, steps + 1):

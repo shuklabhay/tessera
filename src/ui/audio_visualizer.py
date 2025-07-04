@@ -1,13 +1,15 @@
+from typing import Optional
+
 import numpy as np
 
 
 class AudioVisualizer:
-    def __init__(self, window_size=1024, smoothing=0.9):
+    def __init__(self, window_size: int = 1024, smoothing: float = 0.9) -> None:
         self.window_size = window_size
         self.smoothing = smoothing
         self.current_amplitude = 0.0
 
-    def process_audio(self, audio_data):
+    def process_audio(self, audio_data: Optional[bytes]) -> float:
         """Process audio data to compute amplitude for visualization."""
         if not audio_data:
             # Apply decay when no audio
@@ -31,10 +33,10 @@ class AudioVisualizer:
 
         return float(self.current_amplitude)
 
-    def get_current_amplitude(self):
+    def get_current_amplitude(self) -> float:
         """Get the current smoothed amplitude value."""
         return self.current_amplitude
 
-    def update_orb(self, amplitude):
+    def update_orb(self, amplitude: float) -> None:
         """Update orb based on amplitude (placeholder method)."""
         pass

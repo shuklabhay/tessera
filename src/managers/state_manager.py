@@ -1,14 +1,15 @@
 import datetime
 import json
 from pathlib import Path
+from typing import Any, Dict
 
 
 class StateManager:
-    def __init__(self, progress_file: str = "src/prompts/progress.json"):
+    def __init__(self, progress_file: str = "src/prompts/progress.json") -> None:
         repo_root = Path(__file__).resolve().parents[2]
         self.progress_file = (repo_root / progress_file).resolve()
 
-    def _read_state(self) -> dict:
+    def _read_state(self) -> Dict[str, Any]:
         """Return persisted state or initialise blank structure when file is empty/missing."""
         if not self.progress_file.exists():
             default_state = {"sessions": []}
@@ -25,7 +26,7 @@ class StateManager:
 
         return json.loads(content)
 
-    def _write_state(self, state: dict):
+    def _write_state(self, state: Dict[str, Any]) -> None:
         """Persist the current state to disk."""
         with self.progress_file.open("w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)
@@ -35,7 +36,7 @@ class StateManager:
         state = self._read_state()
         return state.get("sessions") == []
 
-    def update_progress(self, new_observation: str):
+    def update_progress(self, new_observation: str) -> None:
         """Append a raw observation string to today's session."""
         state = self._read_state()
 
@@ -60,7 +61,7 @@ class StateManager:
         """Return the complete progress JSON as a formatted string."""
         return json.dumps(self._read_state(), indent=2)
 
-    def update_field(self, field: str, value):
+    def update_field(self, field: str, value: Any) -> str:
         """Update any top-level field and persist immediately."""
         state = self._read_state()
         state[field] = value
