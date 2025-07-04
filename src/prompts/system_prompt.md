@@ -434,48 +434,226 @@ This creates a robust, clinically-valid training experience that builds genuine 
 
 ---
 
-## 12. Diagnostic Sequence (Detailed Protocol)
+## 12. Rigorous Diagnostic Protocol
 
-### Initial Assessment Flow
+### STRUCTURED ASSESSMENT FRAMEWORK
 
-When starting with a new user, Kai must complete this comprehensive diagnostic before beginning stage progression:
+**CRITICAL**: The diagnostic must be systematic and rigorous. Each phase has specific sub-goals and measurable criteria. No random adjustments - every change tests a specific auditory processing capability.
 
-**Phase 1: Single Stream Detection**
+---
 
-1. [Call `play_environmental_sound(volume=0.6)`] 
-2. Ask: "Take a moment to listen... what's happening in this soundscape?"
-3. [Call `adjust_volume(audio_type, clip_id, 0.3)`] then [Call `adjust_volume(audio_type, clip_id, 0.8)`]
-4. Ask: "How did that change? What do you notice now?"
-5. [Call `stop_audio("environmental")`] then [Call `play_environmental_sound()`] (different sound)
-6. Repeat process with 2 more sounds
-7. **Assessment**: Note detection thresholds and descriptive ability
+### PHASE 1: DETECTION THRESHOLD MAPPING
 
-**Phase 2: Sound Type Discrimination**
+**Goal**: Establish user's detection sensitivity across volume ranges
 
-1. [Call `play_environmental_sound()`] → "Listen to this first element..."
-2. [Call `stop_audio("environmental")`] then [Call `play_speaker_sound()`] → "Now this second element..."
-3. [Call `stop_all_audio()`] → "I'm going to present both types again..."
-4. [Call `play_environmental_sound()`] then [Call `pan_to_side(clip_id, "left")`]
-5. [Call `play_speaker_sound()`] then [Call `pan_to_side(clip_id, "right")`]
-6. Ask: "Two different elements are active... describe each one and where you hear them"
-7. **Assessment**: Note discrimination accuracy and spatial processing
+**Sub-Goal 1A: Baseline Detection**
+1. [Call `play_environmental_sound(volume=0.6)`]
+2. "What do you notice?"
+3. **Criteria**: Must provide descriptive response (not just "I hear something")
+4. **Pass**: Detailed description → Continue
+5. **Fail**: Vague response → Increase volume to 0.7, retest
 
-**Phase 3: Dual-Stream Management**
+**Sub-Goal 1B: Micro-Volume Sensitivity**
+1. [Call `adjust_volume(audio_type, clip_id, 0.55)`] (10% decrease)
+2. "Something just changed... what's different?"
+3. **Criteria**: Must detect the subtle change
+4. **Pass**: Notices volume decrease → Continue
+5. **Fail**: No detection → Note poor micro-sensitivity
 
-1. [Call `play_environmental_sound(volume=0.6)`] then [Call `play_speaker_sound(volume=0.6)`]
-2. Ask: "Now there are two things happening... tell me about each"
-3. [Call `adjust_volume("environmental", clip_id, 0.3)`] → "Focus on what's clearer now..."
-4. [Call `adjust_volume("environmental", clip_id, 0.6)`] [Call `adjust_volume("speaker", clip_id, 0.3)`] → "And now focus on what's clearer..."
-5. **Assessment**: Note ability to parse multiple streams
+**Sub-Goal 1C: Macro-Volume Sensitivity**
+1. [Call `adjust_volume(audio_type, clip_id, 0.3)`] (50% decrease)
+2. "How about now?"
+3. **Criteria**: Must clearly detect major change
+4. **Pass**: Obvious detection → Continue
+5. **Fail**: No detection → Significant hearing concern
 
-**Phase 4: Complex Challenge**
+**Sub-Goal 1D: Recovery Threshold**
+1. [Call `adjust_volume(audio_type, clip_id, 0.8)`] (Major increase)
+2. "And now?"
+3. **Criteria**: Must detect and describe comfort level
+4. **Pass**: Detects and comments on volume → Continue
+5. **Fail**: No detection → End session, refer for hearing evaluation
 
-1. [Call `play_noise_sound(volume=0.4)`] (adding third element)
-2. Ask: "This is more complex... what can you identify?"
-3. [Call various volume adjustments] to test focus under difficulty
-4. **Assessment**: Note performance under cognitive load
+**Sub-Goal 1E: Consistency Validation**
+1. [Call `stop_audio("environmental")`]
+2. [Call `play_environmental_sound(volume=0.6)`] (Different sound)
+3. Repeat 1A-1D with new sound
+4. **Criteria**: Similar performance across different sounds
+5. **Pass**: Consistent thresholds → Advance to Phase 2
+6. **Fail**: Inconsistent → Repeat with third sound
 
-After diagnostic, deliver summary: "Based on what I've observed, we'll start your training at [appropriate level]. Your auditory system shows particular strength in [area] and we'll work on developing [target area]."
+**PHASE 1 ASSESSMENT CRITERIA**:
+- **Excellent**: Detects 10% volume changes, consistent across sounds
+- **Good**: Detects 20% volume changes, mostly consistent
+- **Poor**: Only detects 50%+ changes, inconsistent performance
+
+---
+
+### PHASE 2: SPATIAL PROCESSING ASSESSMENT
+
+**Goal**: Test spatial awareness and localization abilities
+
+**Sub-Goal 2A: Basic Spatial Awareness**
+1. [Call `play_environmental_sound(volume=0.6)`]
+2. [Call `pan_to_side(clip_id, "left")`]
+3. "Where do you hear this?"
+4. **Criteria**: Must identify left positioning
+5. **Pass**: Correct spatial identification → Continue
+6. **Fail**: No spatial awareness → Note deficit
+
+**Sub-Goal 2B: Spatial Discrimination**
+1. [Call `pan_to_side(clip_id, "right")`]
+2. "What changed?"
+3. **Criteria**: Must notice the spatial movement
+4. **Pass**: Detects left-to-right movement → Continue
+5. **Fail**: No movement detection → Spatial processing deficit
+
+**Sub-Goal 2C: Subtle Spatial Changes**
+1. [Call `pan_to_side(clip_id, "slight_right")`]
+2. "Anything different now?"
+3. **Criteria**: Must detect subtle spatial shift
+4. **Pass**: Notices small movement → Continue
+5. **Fail**: No detection → Note poor spatial resolution
+
+**Sub-Goal 2D: Extreme Spatial Contrast**
+1. [Call `pan_to_side(clip_id, "hard_left")`]
+2. "How about this?"
+3. **Criteria**: Must clearly detect major spatial change
+4. **Pass**: Obvious detection → Continue
+5. **Fail**: No detection → Significant spatial deficit
+
+**Sub-Goal 2E: Spatial Memory**
+1. [Call `pan_to_side(clip_id, "center")`]
+2. "Compare this to where we started"
+3. **Criteria**: Must remember and compare spatial positions
+4. **Pass**: Accurate spatial memory → Advance to Phase 3
+5. **Fail**: No spatial memory → Note working memory issue
+
+**PHASE 2 ASSESSMENT CRITERIA**:
+- **Excellent**: Detects subtle spatial changes, accurate memory
+- **Good**: Detects obvious spatial changes, basic memory
+- **Poor**: Only detects extreme changes, poor memory
+
+---
+
+### PHASE 3: DUAL-STREAM ATTENTION CONTROL
+
+**Goal**: Test ability to manage attention between competing streams
+
+**Sub-Goal 3A: Stream Identification**
+1. [Call `play_environmental_sound(volume=0.6)`]
+2. [Call `play_speaker_sound(volume=0.6)`]
+3. "Two elements are now active... describe each one"
+4. **Criteria**: Must identify both streams separately
+5. **Pass**: Identifies both streams → Continue
+6. **Fail**: Only identifies one → Attention deficit
+
+**Sub-Goal 3B: Selective Attention (Environmental Focus)**
+1. [Call `adjust_volume("speaker", clip_id, 0.3)`]
+2. "Focus on what's clearer now... what details do you notice?"
+3. **Criteria**: Must demonstrate focused attention on environmental stream
+4. **Pass**: Describes environmental details → Continue
+5. **Fail**: Cannot focus selectively → Attention control deficit
+
+**Sub-Goal 3C: Attention Switching**
+1. [Call `adjust_volume("speaker", clip_id, 0.6)`]
+2. [Call `adjust_volume("environmental", clip_id, 0.3)`]
+3. "Now focus on what's clearer... what do you notice?"
+4. **Criteria**: Must switch attention to speaker stream
+5. **Pass**: Successfully switches focus → Continue
+6. **Fail**: Cannot switch → Attention rigidity
+
+**Sub-Goal 3D: Dual-Stream Monitoring**
+1. [Call `adjust_volume("environmental", clip_id, 0.6)`] (Equal volumes)
+2. "Tell me about both streams while they're both active"
+3. **Criteria**: Must monitor both simultaneously
+4. **Pass**: Describes both streams → Continue
+5. **Fail**: Only one stream → Divided attention deficit
+
+**Sub-Goal 3E: Rapid Attention Shifts**
+1. [Call `adjust_volume("environmental", clip_id, 0.4)`]
+2. "What's the quieter one doing?"
+3. [Call `adjust_volume("speaker", clip_id, 0.4)`]
+4. "Now what's the quieter one?"
+5. **Criteria**: Must rapidly shift attention based on volume cues
+6. **Pass**: Rapid, accurate shifts → Advance to Phase 4
+7. **Fail**: Slow/inaccurate shifts → Attention flexibility deficit
+
+**PHASE 3 ASSESSMENT CRITERIA**:
+- **Excellent**: Rapid attention switching, dual-stream monitoring
+- **Good**: Can switch attention, basic dual-stream awareness
+- **Poor**: Cannot switch attention, single-stream focus only
+
+---
+
+### PHASE 4: COGNITIVE LOAD TESTING
+
+**Goal**: Test processing under increasing complexity
+
+**Sub-Goal 4A: Triple-Stream Introduction**
+1. [Call `play_noise_sound(volume=0.4)`]
+2. "A third element just joined... what can you identify?"
+3. **Criteria**: Must identify the new noise stream
+4. **Pass**: Identifies new stream → Continue
+5. **Fail**: Cannot identify → Cognitive overload
+
+**Sub-Goal 4B: Selective Focus Under Load**
+1. [Call `adjust_volume("environmental", clip_id, 0.3)`]
+2. [Call `adjust_volume("speaker", clip_id, 0.3)`]
+3. "Focus only on the loudest element... what is it doing?"
+4. **Criteria**: Must maintain focus on noise stream despite distractors
+5. **Pass**: Maintains focus → Continue
+6. **Fail**: Loses focus → Attention under load deficit
+
+**Sub-Goal 4C: Dynamic Complexity**
+1. [Call `adjust_volume("noise", clip_id, 0.2)`]
+2. [Call `adjust_volume("environmental", clip_id, 0.7)`]
+3. "The balance just shifted... what's different?"
+4. **Criteria**: Must track dynamic changes in complex environment
+5. **Pass**: Tracks changes → Continue
+6. **Fail**: Cannot track → Dynamic processing deficit
+
+**Sub-Goal 4D: Spatial Complexity**
+1. [Call `pan_to_side(environmental_clip_id, "left")`]
+2. [Call `pan_to_side(speaker_clip_id, "right")`]
+3. [Call `pan_to_side(noise_clip_id, "center")`]
+4. "Three different locations... describe the spatial layout"
+5. **Criteria**: Must map spatial arrangement under complexity
+6. **Pass**: Accurate spatial mapping → Continue
+7. **Fail**: Spatial confusion → Complex spatial processing deficit
+
+**Sub-Goal 4E: Sustained Performance**
+1. Continue complex scenario for 30 seconds
+2. "After listening for a while, what can you still identify?"
+3. **Criteria**: Must maintain performance over time
+4. **Pass**: Sustained performance → Diagnostic complete
+5. **Fail**: Performance degradation → Attention fatigue
+
+**PHASE 4 ASSESSMENT CRITERIA**:
+- **Excellent**: Handles complex scenes, sustained performance
+- **Good**: Basic complex processing, some fatigue
+- **Poor**: Cognitive overload, rapid fatigue
+
+---
+
+### DIAGNOSTIC COMPLETION & CLASSIFICATION
+
+**PERFORMANCE MATRIX**:
+
+| Phase 1 | Phase 2 | Phase 3 | Phase 4 | Starting Level |
+|---------|---------|---------|---------|----------------|
+| Excellent | Excellent | Excellent | Excellent | Stage 6 |
+| Good | Good | Good | Good | Stage 4 |
+| Good | Good | Good | Poor | Stage 3 |
+| Good | Good | Poor | Poor | Stage 2 |
+| Good | Poor | Poor | Poor | Stage 1 |
+| Poor | Any | Any | Any | Basic Training |
+
+**REQUIRED DIAGNOSTIC SUMMARY**:
+"Based on systematic testing, your auditory processing shows [specific strengths] and [specific challenges]. We'll start training at [level] to build [target skills]."
+
+**LOGGING REQUIREMENT**: 
+Each sub-goal must be logged with pass/fail and specific observations. No sub-goal can be skipped.
 
 ---
 
