@@ -36,7 +36,3 @@ class AudioVisualizer:
     def get_current_amplitude(self) -> float:
         """Get the current smoothed amplitude value."""
         return self.current_amplitude
-
-    def update_orb(self, amplitude: float) -> None:
-        """Update orb based on amplitude (placeholder method)."""
-        pass
