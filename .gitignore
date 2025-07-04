@@ -178,5 +178,6 @@ src/planning
 /testing
 .aider*
 .opencode*
+AGENTS.md
 src/prompts/progress.json
 /audio
