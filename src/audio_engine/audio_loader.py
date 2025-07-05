@@ -39,9 +39,7 @@ class AudioLoader:
             for f in os.listdir(path)
             if f.lower().endswith((".wav", ".mp3", ".ogg"))
         ]
-        print(
-            f"Found {len(files)} audio files in {category}: {[os.path.basename(f) for f in files]}"
-        )
+
         return files
 
     def get_random_file(self, category: str) -> Optional[str]:
@@ -55,12 +53,6 @@ class AudioLoader:
         """Load and process audio file to 24kHz stereo format."""
         # Load audio data
         data, sample_rate = sf.read(filepath, dtype="float32")
-
-        # Log details for debugging
-        print(
-            f"Loading '{os.path.basename(filepath)}' sample_rate={sample_rate}Hz",
-            flush=True,
-        )
 
         # Convert to stereo
         if len(data.shape) == 1:

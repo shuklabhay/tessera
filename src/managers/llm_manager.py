@@ -67,6 +67,7 @@ class LLMManager:
         self.thread = None
 
     def _get_contextual_system_prompt(self) -> str:
+        """Get the contextual system prompt."""
         base_prompt = load_system_prompt()
         context_summary = self.state_manager.get_context_summary()
         if context_summary:
@@ -74,23 +75,23 @@ class LLMManager:
         return base_prompt
 
     def _determine_startup_phase(self) -> str:
-        """Return startup phase keyword based on persisted state."""
+        """Determine the startup phase."""
         state = self.state_manager._read_state()
 
-        # Introduction when no previous sessions
+        # Set phase based on session history
         if not state.get("sessions"):
             return "intro"
-
-        # Simple heuristic for training vs diagnostic
         if len(state["sessions"]) < 5:
             return "training"
         return "diagnostic"
 
     def update_progress_file(self, new_observation: str) -> str:
+        """Update the progress file."""
         self.state_manager.update_progress(new_observation)
         return "Progress successfully logged."
 
     def get_tools(self) -> List[types.Tool]:
+        """Get the available tools."""
         return [
             types.Tool(
                 function_declarations=[
@@ -336,22 +337,22 @@ class LLMManager:
     def audio_callback(
         self, indata: np.ndarray, frames: int, time: Any, status: Any
     ) -> None:
-        # Don't process input when Gemini is speaking to avoid audio feedback loop
+        """Process incoming audio."""
         if not self.running or self.gemini_speaking:
             return
         current_time = time_module.time()
         amplitude = np.linalg.norm(indata)
 
-        # Process audio
+        # Process audio if recording
         if self.recording:
             self.audio_in_queue.put_nowait(bytes(indata))
 
-            # Update voice detection timestamp if speaking
+            # Update voice detection timestamp
             if amplitude > self.speech_threshold:
                 self.last_voice_detected = current_time
 
             if current_time >= self.check_time:
-                # Determine if still speaking
+                # Check if still speaking
                 still_speaking = (
                     current_time - self.last_voice_detected
                 ) < self.recording_duration
@@ -362,33 +363,31 @@ class LLMManager:
                 else:
                     self.recording = False
                     self.audio_in_queue.put_nowait(None)
-                    self.audio_controller.duck_background(False)
 
-        # Start recording when speech detected
+        # Start recording if speech detected
         elif amplitude > self.speech_threshold:
             self.recording = True
-            self.audio_controller.duck_background(True)
             self.last_voice_detected = current_time
             self.check_time = current_time + self.recording_duration
             self.audio_in_queue.put_nowait(bytes(indata))
 
-        # Mark turn end
+        # Mark turn end after silence
         elif not self.recording and amplitude < self.speech_threshold:
             if self.silence_start_time is None:
                 self.silence_start_time = current_time
             elif (current_time - self.silence_start_time) >= self.recording_duration:
                 self.audio_in_queue.put_nowait(None)
                 self.silence_start_time = None
-                self.audio_controller.duck_background(False)
         else:
-            # Reset silence timer if any non-silent activity detected.
+            # Reset silence timer
             self.silence_start_time = None
 
     async def listen_audio(self) -> None:
+        """Listen for audio from the input stream."""
         self.recording = False
         self.last_voice_detected = time_module.time()
 
-        # Create audio stream
+        # Create and start audio stream
         self.input_stream = sd.InputStream(
             samplerate=SEND_SAMPLE_RATE,
             channels=CHANNELS,
@@ -398,19 +397,20 @@ class LLMManager:
         )
         self.input_stream.start()
 
-        # Keep stream running/close properly
+        # Keep stream running
         while self.running:
             await asyncio.sleep(0.1)
         self.input_stream.stop()
         self.input_stream.close()
 
     async def send_audio(self) -> None:
+        """Send audio to the session."""
         chunk_sent = False
         while self.running:
             audio_chunk = await self.audio_in_queue.get()
 
+            # Send audio chunk
             if self.session and audio_chunk is not None:
-                # We only transmit chunks once voice has crossed the threshold
                 await self.session.send_realtime_input(
                     audio=types.Blob(
                         data=audio_chunk,
@@ -419,13 +419,15 @@ class LLMManager:
                 )
                 chunk_sent = True
 
+            # Send end-of-turn signal
             elif self.session and audio_chunk is None:
-                # Send end-of-turn only if at least one chunk was delivered
                 if chunk_sent:
                     await self.session.send_realtime_input(audio_stream_end=True)
                 chunk_sent = False
 
     def execute_function(self, function_call: Any) -> Union[str, Dict[str, Any]]:
+        """Execute a function call from the model."""
+        print(function_call)
         function_name = function_call.name
         args = function_call.args if hasattr(function_call, "args") else {}
 
@@ -483,6 +485,7 @@ class LLMManager:
             return f"Unknown function: {function_name}"
 
     async def receive_and_process_responses(self) -> None:
+        """Receive and process responses from the model."""
         while self.running:
             has_audio_in_turn = False
             turn = self.session.receive()
@@ -490,12 +493,12 @@ class LLMManager:
                 if not self.running:
                     break
 
+                # Handle tool calls
                 if (
                     hasattr(response, "tool_call")
                     and response.tool_call
                     and hasattr(response.tool_call, "function_calls")
                 ):
-                    # Model can emit one or many function calls in the same turn
                     fc_list = list(response.tool_call.function_calls)
                     function_responses = []
                     for function_call in fc_list:
@@ -516,17 +519,18 @@ class LLMManager:
                             )
                         )
 
-                    # Send all responses together
+                    # Send responses
                     await self.session.send_tool_response(
                         function_responses=function_responses
                     )
 
+                # Handle server content
                 if response.server_content and response.server_content.model_turn:
                     for part in response.server_content.model_turn.parts:
                         if part.inline_data and part.inline_data.data:
                             if not self.gemini_speaking:
                                 self.gemini_speaking = True
-                                self.audio_controller.duck_background(True)
+                                self.audio_controller._auto_duck_background(True)
                             has_audio_in_turn = True
                             audio_data = part.inline_data.data
                             self.out_queue.put_nowait(audio_data)
@@ -536,13 +540,14 @@ class LLMManager:
                 self.turn_ended.set()
 
     async def play_audio(self) -> None:
+        """Play audio from the output stream."""
         self.output_stream = sd.OutputStream(
             samplerate=RECEIVE_SAMPLE_RATE, channels=CHANNELS, dtype=np.int16
         )
         self.output_stream.start()
 
         while self.running:
-            # Play chunks
+            # Play audio chunk
             audio_chunk = await self.out_queue.get()
             if audio_chunk:
                 audio_array = np.frombuffer(audio_chunk, dtype=np.int16)
@@ -553,18 +558,21 @@ class LLMManager:
         self.output_stream.close()
 
     async def manage_speaking_state(self) -> None:
+        """Manage the speaking state of the model."""
         while self.running:
             await self.turn_ended.wait()
             await self.out_queue.join()
             self.gemini_speaking = False
-            # Log introduction completion once the first intro speech ends
+            self.audio_controller._auto_duck_background(False)
+
+            # Log introduction completion
             if self._log_intro_pending:
                 self.state_manager.update_progress("Introduction finished.")
                 self._log_intro_pending = False
             self.turn_ended.clear()
 
     async def _send_initial_prompt(self) -> None:
-        # Choose initial user message based on startup phase
+        """Send the initial prompt to the model."""
         if self.startup_phase == "intro":
             text = "Initialize introduction phase for new user."
             self._log_intro_pending = True
@@ -579,12 +587,12 @@ class LLMManager:
         )
 
     async def run_async(self) -> None:
+        """Run the asynchronous event loop."""
         self.running = True
         async with client.aio.live.connect(
             model=MODEL, config=self.get_live_config()
         ) as session:
             self.session = session
-            # Connected to Gemini Live
 
             await self._send_initial_prompt()
 
@@ -600,20 +608,22 @@ class LLMManager:
         self.stop()
 
     def run_in_thread(self) -> None:
-        """Run the async event loop in a separate thread"""
+        """Run the async event loop in a thread."""
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         self.loop.run_until_complete(self.run_async())
 
     def start(self) -> bool:
+        """Start the LLM manager."""
         self.running = True
 
-        # Start the async code in a separate thread
+        # Start async code in a thread
         self.thread = threading.Thread(target=self.run_in_thread, daemon=True)
         self.thread.start()
         return True
 
     def stop(self) -> None:
+        """Stop the LLM manager."""
         self.running = False
 
         if self.input_stream:

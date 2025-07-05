@@ -1,3 +1,12 @@
+import logging
+import os
+
+# Disable debug logging
+os.environ["KIVY_LOG_LEVEL"] = "warning"
+logging.getLogger().setLevel(logging.WARNING)
+logging.getLogger("websockets").setLevel(logging.WARNING)
+logging.getLogger("google").setLevel(logging.WARNING)
+
 from managers.llm_manager import LLMManager
 from ui.main_app import TesseraApp
 
