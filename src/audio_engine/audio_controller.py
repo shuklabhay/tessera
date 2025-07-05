@@ -11,8 +11,8 @@ from audio_engine.mixer import AudioMixer
 
 # Volume limits for different channel types
 GEMINI_VOLUME = 1.0
-BACKGROUND_VOLUME_MAX = 0.4
-NORMAL_VOLUME_MAX = 0.7
+BACKGROUND_VOLUME_MAX = 0.2
+NORMAL_VOLUME_MAX = 0.6
 
 
 class AudioController:

@@ -181,13 +181,13 @@ class LLMManager:
                     ),
                     types.FunctionDeclaration(
                         name="add_session_observation",
-                        description="Append a short JSON-compatible summary of the latest session observation to progress log.",
+                        description="Log a high-level summary of the user's performance on a specific skill, observed over several trials.",
                         parameters=types.Schema(
                             type=types.Type.OBJECT,
                             properties={
                                 "summary": types.Schema(
                                     type=types.Type.STRING,
-                                    description="Concise observation text.",
+                                    description="A concise summary of the user's demonstrated ability (e.g., 'User can reliably identify two streams') or inability (e.g., 'User struggles to discriminate speech from noise').",
                                 )
                             },
                             required=["summary"],
@@ -367,6 +367,7 @@ class LLMManager:
         # Start recording if speech detected
         elif amplitude > self.speech_threshold:
             self.recording = True
+            self.audio_controller._auto_duck_background(True)
             self.last_voice_detected = current_time
             self.check_time = current_time + self.recording_duration
             self.audio_in_queue.put_nowait(bytes(indata))
