@@ -10,9 +10,9 @@ from audio_engine.audio_loader import AudioLoader
 from audio_engine.mixer import AudioMixer
 
 # Volume limits for different channel types
-GEMINI_VOLUME = 1.0
+GEMINI_VOLUME = 1.2
 BACKGROUND_VOLUME_MAX = 0.2
-NORMAL_VOLUME_MAX = 0.6
+NORMAL_VOLUME_MAX = 0.5
 
 
 class AudioController:
@@ -151,10 +151,21 @@ class AudioController:
             if clip["channel"] != self.channel_map["gemini"]:
                 self._fade_volume(clip_id, clip["volume"], target_volume, 0.3)
 
+    def _has_similar_environmental_sound(self) -> bool:
+        """Check if there's already an environmental sound playing."""
+        for clip in self.clips.values():
+            if clip["type"] == "environmental":
+                return True
+        return False
+
     def play_environmental_sound(
         self, volume: float = 0.7
     ) -> Union[str, Dict[str, Any]]:
         """Play a random environmental sound."""
+        # Check for existing environmental sounds to avoid duplicates
+        if self._has_similar_environmental_sound():
+            return "Environmental sound already playing. Stop existing environmental sounds first to add a new one."
+
         # Set volume and get audio
         target_volume = max(0.0, min(NORMAL_VOLUME_MAX, volume))
         audio, filepath = self.loader.get_cached_audio("environmental")

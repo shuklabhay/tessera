@@ -361,8 +361,10 @@ class LLMManager:
                 if still_speaking:
                     self.check_time = current_time + self.recording_duration
                 else:
+                    # Recording duration complete - end turn immediately
                     self.recording = False
                     self.audio_in_queue.put_nowait(None)
+                    self.audio_controller._auto_duck_background(False)
 
         # Start recording if speech detected
         elif amplitude > self.speech_threshold:
@@ -372,15 +374,8 @@ class LLMManager:
             self.check_time = current_time + self.recording_duration
             self.audio_in_queue.put_nowait(bytes(indata))
 
-        # Mark turn end after silence
-        elif not self.recording and amplitude < self.speech_threshold:
-            if self.silence_start_time is None:
-                self.silence_start_time = current_time
-            elif (current_time - self.silence_start_time) >= self.recording_duration:
-                self.audio_in_queue.put_nowait(None)
-                self.silence_start_time = None
+        # Reset silence timer when not recording
         else:
-            # Reset silence timer
             self.silence_start_time = None
 
     async def listen_audio(self) -> None:

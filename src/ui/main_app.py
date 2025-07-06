@@ -55,16 +55,19 @@ class MainLayout(FloatLayout):
             self.llm_manager.start()
 
     def update_orb_from_audio(self, dt: float) -> None:
-        """Update orb visualization based on latest audio data."""
-        if not self.llm_manager or not self.llm_manager.viz_queue:
+        """Update orb visualization based on Kai's speech only."""
+        if not self.llm_manager:
             self.orb.start_idle_animation(delay=0.5)
             return
 
-        # Process Gemini's output audio for visualization
-        if self.llm_manager.viz_queue:
+        # Only move orb when Kai is actively speaking
+        if self.llm_manager.gemini_speaking and self.llm_manager.viz_queue:
             audio_chunk = self.llm_manager.viz_queue.pop(0)
             amplitude = self.audio_visualizer.process_audio(audio_chunk)
             self.orb.update_from_amplitude(amplitude * 1.5)
+        else:
+            # Return to idle animation when Kai is not speaking
+            self.orb.start_idle_animation(delay=0.5)
 
 
 class TesseraApp(App):
