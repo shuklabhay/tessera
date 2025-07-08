@@ -65,6 +65,8 @@ class LLMManager:
         self._log_intro_pending = False
         self.loop = None
         self.thread = None
+        self.is_muted = False
+        self.is_paused = False
 
     def _get_contextual_system_prompt(self) -> str:
         """Get the contextual system prompt."""
@@ -338,7 +340,7 @@ class LLMManager:
         self, indata: np.ndarray, frames: int, time: Any, status: Any
     ) -> None:
         """Process incoming audio."""
-        if not self.running or self.gemini_speaking:
+        if not self.running or self.gemini_speaking or self.is_muted or self.is_paused:
             return
         current_time = time_module.time()
         amplitude = np.linalg.norm(indata)
@@ -404,6 +406,11 @@ class LLMManager:
         chunk_sent = False
         while self.running:
             audio_chunk = await self.audio_in_queue.get()
+
+            # Handle welcome back message
+            if audio_chunk == "WELCOME_BACK":
+                await self._send_welcome_back_message()
+                continue
 
             # Send audio chunk
             if self.session and audio_chunk is not None:
@@ -545,7 +552,7 @@ class LLMManager:
         while self.running:
             # Play audio chunk
             audio_chunk = await self.out_queue.get()
-            if audio_chunk:
+            if audio_chunk and not self.is_paused:
                 audio_array = np.frombuffer(audio_chunk, dtype=np.int16)
                 self.output_stream.write(audio_array)
             self.out_queue.task_done()
@@ -617,6 +624,52 @@ class LLMManager:
         self.thread = threading.Thread(target=self.run_in_thread, daemon=True)
         self.thread.start()
         return True
+
+    def set_mute(self, muted: bool) -> None:
+        """Set mute state."""
+        self.is_muted = muted
+        if muted:
+            # Stop current recording if muted
+            if self.recording:
+                self.recording = False
+                self.audio_in_queue.put_nowait(None)
+                self.audio_controller._auto_duck_background(False)
+
+    def set_pause(self, paused: bool) -> None:
+        """Set pause state."""
+        self.is_paused = paused
+        if paused:
+            # Stop current recording and clear queues
+            if self.recording:
+                self.recording = False
+                self.audio_controller._auto_duck_background(False)
+
+            # Clear audio queues to stop pending audio
+            while not self.audio_in_queue.empty():
+                self.audio_in_queue.get_nowait()
+            while not self.out_queue.empty():
+                self.out_queue.get_nowait()
+
+            # Stop all background audio
+            self.audio_controller.stop_all_audio()
+
+            # Immediately stop speaking state and clear visualization
+            self.gemini_speaking = False
+            self.viz_queue.clear()
+        else:
+            # When unpausing, send welcome back through audio queue
+            if self.session:
+                self.audio_in_queue.put_nowait("WELCOME_BACK")
+
+    async def _send_welcome_back_message(self) -> None:
+        """Send welcome back message when unpausing."""
+        await self.session.send_client_content(
+            turns={
+                "role": "user",
+                "parts": [{"text": "Welcome back. Let's continue."}],
+            },
+            turn_complete=True,
+        )
 
     def stop(self) -> None:
         """Stop the LLM manager."""

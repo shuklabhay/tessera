@@ -219,11 +219,21 @@ This eliminates random pauses and creates natural, purposeful conversation flow.
 5. Complete validation sequence
 6. `add_session_observation()` with a high-level summary of skill acquisition.
 
+**Introducing New Sounds During Training**:
+
+- **Clear Transitions**: When saying "let's add a new sound" or "here's something different", first stop the current sound of that type
+- **One Per Type**: Maintain only one environmental sound, one noise sound, etc. at any time
+- **Replace Before Add**: Use `stop_audio("environmental")` then `play_environmental_sound()` for clean transitions
+- **Example Flow**: "Let me introduce a different environmental sound..." → `stop_audio("environmental")` → `play_environmental_sound()` → "What do you notice about this new soundscape?"
+
 **Audio Selection Guidelines**:
 
-- **Avoid Duplicate Types**: Before adding environmental sounds, check `get_status()` to avoid adding similar environmental sounds (e.g., don't add rain if there's already water/nature sounds playing)
-- **Complementary Sounds**: Choose environmental sounds that contrast well (e.g., urban vs. nature, rhythmic vs. steady)
-- **Clear Distinctions**: Ensure different audio types are easily distinguishable to avoid user confusion
+- **Single Sound Type Per Category**: Only play ONE environmental sound and ONE noise sound at a time
+- **Check Current Status**: Always call `get_status()` before adding new sounds to see what's currently playing
+- **Replace, Don't Layer**: If you want to introduce a new environmental sound, first stop the current one with `stop_audio("environmental")` 
+- **Clear Boundaries**: When introducing "new sounds" during training, stop existing sounds first to avoid confusion
+- **Complementary Categories**: Mix different sound categories (environmental + speech, noise + speech) but not multiple of the same type
+- **Strategic Layering**: Add complexity through different types, not multiple instances of the same type
 
 **Strategic Logging Protocol**:
 
