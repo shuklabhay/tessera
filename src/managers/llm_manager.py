@@ -3,8 +3,7 @@ import os
 import ssl
 import threading
 import time as time_module
-import traceback
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 
 import certifi
 import numpy as np
