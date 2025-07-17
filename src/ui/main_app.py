@@ -17,6 +17,8 @@ Window.resizable = True
 
 
 class MainLayout(FloatLayout):
+    """A Kivy FloatLayout that serves as the main container for the application's UI."""
+
     def __init__(self, llm_manager: Optional[Any] = None, **kwargs) -> None:
         super(MainLayout, self).__init__(**kwargs)
         with self.canvas.before:
@@ -35,7 +37,6 @@ class MainLayout(FloatLayout):
         self.audio_visualizer = AudioVisualizer()
         Clock.schedule_interval(self.update_orb_from_audio, 1 / 30)
 
-        # Add control overlay (must fill entire screen for positioning)
         self.control_overlay = ControlOverlay(
             on_mute=self._handle_mute,
             on_pause=self._handle_pause,
@@ -44,23 +45,29 @@ class MainLayout(FloatLayout):
         )
         self.add_widget(self.control_overlay)
 
-        # Start LLM manager when layout is ready
         if self.llm_manager:
             Clock.schedule_once(self.start_llm_manager, 1)
 
     def _update_bg(self, instance: Any, value: Any) -> None:
-        """Update background and orb size when window resizes."""
-        # Update background rectangle
+        """Updates the background and orb size when the window is resized.
+
+        Args:
+            instance (Any): The instance that fired the event.
+            value (Any): The new value of the property.
+        """
         self.bg.pos = instance.pos
         self.bg.size = instance.size
 
-        # Update orb size based on window dimensions
         if hasattr(self, "orb"):
             self.orb.base_radius = min(Window.width, Window.height) / 6
             self.orb.glow_radius = self.orb.base_radius * 1.1
 
     def start_llm_manager(self, dt: float) -> None:
-        """Start the LLM manager conversation loop in a separate thread."""
+        """Starts the LLM manager's conversation loop in a separate thread.
+
+        Args:
+            dt (float): The time elapsed since the last call.
+        """
         if self.llm_manager:
             import threading
             conversation_thread = threading.Thread(
@@ -70,38 +77,55 @@ class MainLayout(FloatLayout):
             conversation_thread.start()
 
     def _handle_mute(self, is_muted: bool) -> None:
-        """Handle mute state change."""
-        # For the new implementation, mute functionality would need to be added
+        """Handles a change in the mute state.
+
+        Args:
+            is_muted (bool): A boolean indicating if the audio is muted.
+        """
         pass
 
     def _handle_pause(self, is_paused: bool) -> None:
-        """Handle pause state change."""
-        # For the new implementation, pause functionality would need to be added
-        # Stop orb animations when paused
+        """Handles a change in the pause state.
+
+        Args:
+            is_paused (bool): A boolean indicating if the application is paused.
+        """
         if is_paused:
             Animation.cancel_all(self.orb)
         else:
             self.orb.start_idle_animation(delay=0.1)
 
     def update_orb_from_audio(self, dt: float) -> None:
-        """Update orb visualization based on audio activity."""
-        # For the new voice-based implementation, we'll use idle animation
-        # since we don't have the same audio streaming visualization
+        """Updates the orb visualization based on audio activity.
+
+        Args:
+            dt (float): The time elapsed since the last call.
+        """
         self.orb.start_idle_animation(delay=0.5)
 
 
 class TesseraApp(App):
+    """The main Kivy application class for Tessera."""
+
     def __init__(self, llm_manager: Optional[Any] = None, **kwargs) -> None:
         self.llm_manager = llm_manager
         super(TesseraApp, self).__init__(**kwargs)
         self.title = "Tessera"
 
     def build(self) -> MainLayout:
-        """Build and return the main layout."""
+        """Builds and returns the main layout of the application.
+
+        Returns:
+            MainLayout: The main layout widget.
+        """
         return MainLayout(llm_manager=self.llm_manager)
 
     def on_stop(self) -> bool:
-        """Clean up when app closes."""
+        """Cleans up resources when the application is closed.
+
+        Returns:
+            bool: A boolean to indicate if the stopping process should continue.
+        """
         if self.llm_manager:
             self.llm_manager.stop()
         return True

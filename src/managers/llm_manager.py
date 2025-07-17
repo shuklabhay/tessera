@@ -1,415 +1,176 @@
-import io
 import os
 import ssl
-import tempfile
 import threading
-import time as time_module
-import wave
 from typing import Any, Dict, List, Union
 
 import certifi
-import numpy as np
-import pygame
-import sounddevice as sd
 from dotenv import load_dotenv
-from faster_whisper import WhisperModel
-from google import genai
 from google.genai import types
-from piper import PiperVoice, SynthesisConfig
 
 from audio_engine.audio_controller import AudioController
 from managers.state_manager import StateManager
+from services.gemini_service import GeminiService
+from services.recording_service import RecordingService
+from services.transcription_service import TranscriptionService
+from services.tts_service import TextToSpeechService
 
-# --- Environment Setup ---
-try:
-    ssl._create_default_https_context = ssl._create_unverified_context
-except:
-    pass
+ssl._create_default_https_context = ssl._create_unverified_context
 os.environ["SSL_CERT_FILE"] = certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
 load_dotenv()
 
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-
-
-def load_system_prompt() -> str:
-    """Loads the system prompt from a file."""
-    prompt_path = os.path.join(
-        os.path.dirname(__file__), "..", "prompts", "system_prompt.md"
-    )
-    with open(prompt_path, "r") as file:
-        return file.read()
-
 
 class LLMManager:
+    """Orchestrates the voice interaction between the user and the system."""
+
     def __init__(
         self, audio_controller: AudioController, state_manager: StateManager
     ) -> None:
-        """Initialize the LLM manager with voice interaction capabilities."""
         self.audio_controller = audio_controller
         self.state_manager = state_manager
 
-        # Voice recording settings
-        self.sample_rate = 16000
-        self.threshold = 0.01
-        self.silence_duration = 1.5
-        self.is_recording = False
-        self.audio_buffer = []
-
-        # Initialize Whisper for transcription
-        self.whisper_model = WhisperModel("tiny", device="cpu", compute_type="int8")
-
-        # Initialize Piper TTS
-        self.tts_voice = PiperVoice.load(
-            "models/en_US-hfc_male-medium.onnx",
-            "models/en_US-hfc_male-medium.onnx.json",
+        # Initialize services
+        self.recording_service = RecordingService()
+        self.transcription_service = TranscriptionService()
+        self.tts_service = TextToSpeechService(
+            model_path="models/en_US-hfc_male-medium.onnx",
+            config_path="models/en_US-hfc_male-medium.onnx.json",
         )
-        self.syn_config = SynthesisConfig(length_scale=1.3)
-
-        # Initialize pygame mixer for TTS playback
-        pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)
+        self.gemini_service = GeminiService(
+            state_manager=self.state_manager, tools=self.get_tools()
+        )
 
         # Conversation state
-        self.conversation_history = []
         self.has_welcomed = False
-        self.last_tool_results = None  # Store tool results for context
-
-        # Turn-based coordination state
-        self.kai_is_speaking = False
         self.turn_complete_event = threading.Event()
         self.turn_complete_event.set()  # Initially ready for user input
 
-    def record_with_threshold(self) -> bytes:
-        """Record audio when voice threshold is exceeded, stop after silence."""
-        # Check if Kai is currently speaking - if so, don't record
-        if self.kai_is_speaking:
-            return b""
+    def start_conversation(self) -> None:
+        """Starts the voice conversation with a welcome flow."""
+        if not self.has_welcomed:
+            self.has_welcomed = True
+            welcome_prompt = "Give a brief greeting like 'Welcome back, glad to see you again' or similar, then ask if they're ready to get started again and recommend headphones. Wait for their response before proceeding with any training."
+            response = self.gemini_service.generate_with_gemini(welcome_prompt)
+            self.handle_gemini_response(response)
 
-        print("Listening for voice...")
+        threading.Thread(target=self.voice_interaction_loop, daemon=True).start()
 
-        # Reset recording state
-        self.is_recording = False
-        self.audio_buffer = []
-        self.silence_start_time = None
-        self.recording_complete = False
+    def voice_interaction_loop(self) -> None:
+        """The main voice interaction loop."""
+        while True:
+            self.turn_complete_event.wait()
+            audio_bytes = self.recording_service.record_with_threshold()
 
-        def audio_callback(indata, frames, time, status):
-            if status:
-                print(f"Audio status: {status}")
+            if audio_bytes:
+                user_text = self.transcription_service.transcribe_audio(audio_bytes)
 
-            # Double-check Kai isn't speaking during callback
-            if self.kai_is_speaking:
-                self.recording_complete = True
-                return
+                if user_text.strip():
+                    print(f"User: {user_text}")
+                    response = self.gemini_service.generate_with_gemini(user_text)
+                    self.handle_gemini_response(response)
+                else:
+                    self.tts_service.text_to_speech(
+                        "I couldn't make out what you're saying, please try again.",
+                        callback=self._complete_turn,
+                    )
+            else:
+                print("No audio recorded.")
 
-            # Calculate RMS amplitude
-            rms = np.sqrt(np.mean(indata**2))
+    def handle_gemini_response(self, response: Dict[str, Any]) -> None:
+        """Handles a response from the Gemini service.
 
-            if rms > self.threshold:
-                if not self.is_recording:
-                    print("Voice detected, starting recording...")
-                    self.is_recording = True
-                    self.audio_buffer = []
+        Args:
+            response (Dict[str, Any]): The response from the Gemini service.
+        """
+        response_text = response.get("text")
+        tool_calls = response.get("tool_calls")
 
-                # Add audio data to buffer
-                self.audio_buffer.extend(indata.flatten())
-                self.silence_start_time = None
-            elif self.is_recording:
-                # Still recording but below threshold (silence)
-                self.audio_buffer.extend(indata.flatten())
-
-                if self.silence_start_time is None:
-                    self.silence_start_time = time_module.time()
-                elif (
-                    time_module.time() - self.silence_start_time > self.silence_duration
-                ):
-                    print("Silence detected, stopping recording...")
-                    self.recording_complete = True
-
-        # Start recording stream
-        with sd.InputStream(
-            samplerate=self.sample_rate,
-            channels=1,
-            callback=audio_callback,
-            dtype=np.float32,
-            blocksize=1024,
-        ):
-            # Use event-driven approach instead of polling with sleep
-            import threading
-
-            recording_event = threading.Event()
-
-            def check_completion():
-                while not self.recording_complete:
-                    recording_event.wait(0.01)  # Non-blocking wait
-                recording_event.set()
-
-            completion_thread = threading.Thread(target=check_completion, daemon=True)
-            completion_thread.start()
-
-            # Wait for recording to complete
-            recording_event.wait()
-
-        if self.audio_buffer:
-            # Convert to int16 for WAV format
-            audio_data = np.array(self.audio_buffer, dtype=np.float32)
-            audio_data = (audio_data * 32767).astype(np.int16)
-
-            # Create WAV bytes
-            wav_buffer = io.BytesIO()
-            with wave.open(wav_buffer, "wb") as wav_file:
-                wav_file.setnchannels(1)
-                wav_file.setsampwidth(2)
-                wav_file.setframerate(self.sample_rate)
-                wav_file.writeframes(audio_data.tobytes())
-
-            return wav_buffer.getvalue()
-
-        return b""
-
-    def transcribe_audio(self, audio_bytes: bytes) -> str:
-        """Transcribe audio using Whisper."""
-        if not audio_bytes:
-            return ""
-
-        # Save to temporary file for Whisper
-        temp_file = "temp_audio.wav"
-        with open(temp_file, "wb") as f:
-            f.write(audio_bytes)
-
-        try:
-            segments, _ = self.whisper_model.transcribe(temp_file)
-            transcription = " ".join([segment.text for segment in segments])
-            return transcription.strip()
-        finally:
-            # Clean up temp file
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
-
-    def generate_with_gemini(self, user_message: str) -> str:
-        """Generate response using Gemini with tools and system prompt."""
-        # Build system prompt with progress
-        system_prompt = load_system_prompt()
-        progress_context = self.state_manager.get_context_summary()
-        if progress_context:
-            system_prompt += f"\n\n## Current Progress Context:\n{progress_context}"
-
-        # Add user message to conversation history
-        self.conversation_history.append(
-            {"role": "user", "parts": [{"text": user_message}]}
-        )
-
-        # Configure generation
-        generation_config = types.GenerateContentConfig(
-            system_instruction=system_prompt, tools=self.get_tools(), temperature=0.7
-        )
-
-        try:
-            # Generate initial response
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=self.conversation_history,
-                config=generation_config,
-            )
-
-            # Process response and handle tools
-            return self._process_response_with_tools(response, generation_config)
-
-        except Exception as e:
-            print(f"Error generating response: {e}")
-            return "I'm having trouble processing that. Could you try again?"
-
-    def _process_response_with_tools(self, response, generation_config) -> str:
-        """Process response with SEQUENTIAL execution: TTS first, then tools."""
-        # Set Kai speaking state to block recording
-        self.kai_is_speaking = True
+        self.recording_service.set_kai_is_speaking(True)
         self.turn_complete_event.clear()
 
-        response_text = ""
-        tool_calls = []
-
-        if (
-            response.candidates
-            and response.candidates[0].content
-            and response.candidates[0].content.parts
-        ):
-            for part in response.candidates[0].content.parts:
-                if hasattr(part, "text") and part.text:
-                    response_text += part.text
-                elif hasattr(part, "function_call"):
-                    # Collect tool calls but don't execute yet
-                    tool_calls.append(part.function_call)
-
-        # Add assistant response to history
-        if response_text:
-            self.conversation_history.append(
-                {"role": "model", "parts": [{"text": response_text}]}
-            )
-
-        # SEQUENTIAL EXECUTION: TTS first, then tools
         if response_text and tool_calls:
-            # Define callback to execute tools after TTS finishes
-            def execute_tools_after_tts():
-                self._execute_tools_and_follow_up(tool_calls, generation_config)
-
-            # Play TTS with callback
-            self.text_to_speech(response_text, callback=execute_tools_after_tts)
-            return ""  # No immediate response, callback will handle follow-up
-
+            self.tts_service.text_to_speech(
+                response_text,
+                callback=lambda: self._execute_tools_and_follow_up(tool_calls),
+            )
         elif response_text:
-            # Just text, no tools - complete turn after TTS
-            def complete_turn():
-                self._complete_turn()
-
-            self.text_to_speech(response_text, callback=complete_turn)
-            return ""
-
+            self.tts_service.text_to_speech(response_text, callback=self._complete_turn)
         elif tool_calls:
-            # Just tools, no text - execute tools directly
-            self._execute_tools_and_follow_up(tool_calls, generation_config)
-            return ""
+            self._execute_tools_and_follow_up(tool_calls)
+        else:
+            self._complete_turn()
 
-        return ""
+    def _execute_tools_and_follow_up(self, tool_calls: List[Any]) -> None:
+        """Executes tools and generates a follow-up response.
 
-    def _execute_tools_and_follow_up(self, tool_calls, generation_config):
-        """Execute tools and generate follow-up response."""
+        Args:
+            tool_calls (List[Any]): A list of tool calls to execute.
+        """
         tool_results = []
         for tool_call in tool_calls:
             result = self.execute_function(tool_call)
             tool_results.append({"function_name": tool_call.name, "result": result})
             print(f"Tool executed: {tool_call.name} -> {result}")
 
-        # Generate follow-up response with tool results
         if tool_results:
             tool_context = self._format_tool_results(tool_results)
-            follow_up_response = self._generate_tool_follow_up(
-                tool_context, generation_config
+            follow_up_response = self.gemini_service.generate_tool_follow_up(
+                tool_context
             )
-
-            # Play follow-up response with turn completion
-            if follow_up_response:
-
-                def complete_turn():
-                    self._complete_turn()
-
-                self.text_to_speech(follow_up_response, callback=complete_turn)
-            else:
-                # No follow-up response, complete turn directly
-                self._complete_turn()
+            self.handle_gemini_response(follow_up_response)
         else:
-            # No tool results, complete turn
             self._complete_turn()
 
     def _format_tool_results(self, tool_results: List[Dict]) -> str:
-        """Format tool results into a context message for Kai."""
+        """Formats tool results into a context message for the LLM.
+
+        Args:
+            tool_results (List[Dict]): A list of tool results.
+
+        Returns:
+            str: A formatted string of tool results.
+        """
         if not tool_results:
             return ""
-
-        context_parts = []
-        for result in tool_results:
-            context_parts.append(
-                f"Tool '{result['function_name']}' executed: {result['result']}"
-            )
-
+        context_parts = [
+            f"Tool '{result['function_name']}' executed: {result['result']}"
+            for result in tool_results
+        ]
         return (
             "Tool execution results: "
             + "; ".join(context_parts)
             + ". Now respond to the user based on these results."
         )
 
-    def _generate_tool_follow_up(self, tool_context: str, generation_config) -> str:
-        """Generate a follow-up response after tool execution."""
-        # Add tool results as context to conversation
-        self.conversation_history.append(
-            {"role": "user", "parts": [{"text": tool_context}]}
-        )
-
-        try:
-            # Generate follow-up response
-            follow_up_response = client.models.generate_content(
-                model="gemini-2.0-flash-exp",
-                contents=self.conversation_history,
-                config=generation_config,
-            )
-
-            # Process follow-up (could have more tools)
-            return self._process_response_with_tools(
-                follow_up_response, generation_config
-            )
-
-        except Exception as e:
-            print(f"Error in follow-up generation: {e}")
-            return ""
-
     def _complete_turn(self) -> None:
-        """Complete Kai's turn and allow user to speak again."""
+        """Completes the assistant's turn and allows user input again."""
 
         def delayed_turn_completion():
-            # Add 1.5 second buffer to prevent TTS audio pickup
             threading.Event().wait(1.5)
-
-            # Release speaking state and signal turn completion
-            self.kai_is_speaking = False
+            self.recording_service.set_kai_is_speaking(False)
             self.turn_complete_event.set()
             print("Turn completed - ready for user input")
 
         threading.Thread(target=delayed_turn_completion, daemon=True).start()
 
     def update_progress_file(self, new_observation: str) -> str:
-        """Update the progress file."""
+        """Updates the progress file.
+
+        Args:
+            new_observation (str): The new observation to log.
+
+        Returns:
+            str: A confirmation message.
+        """
         self.state_manager.update_progress(new_observation)
         return "Progress successfully logged."
 
-    def text_to_speech(self, text: str, callback=None) -> None:
-        """Convert text to speech using Piper TTS and play it with optional callback."""
-        if not text.strip():
-            if callback:
-                callback()
-            return
-
-        print(f"Kai: {text}")
-
-        # Generate audio with Piper using temporary file
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
-            temp_path = temp_file.name
-
-        # Create WAV file object for Piper
-        with wave.open(temp_path, "wb") as wav_file:
-            self.tts_voice.synthesize_wav(text, wav_file, syn_config=self.syn_config)
-
-        # Read the audio data from file
-        with open(temp_path, "rb") as f:
-            # Skip WAV header (44 bytes) and read raw audio data
-            f.seek(44)
-            audio_bytes = f.read()
-
-        # Clean up temp file
-        os.unlink(temp_path)
-
-        # Convert to numpy array for pygame
-        audio_data = np.frombuffer(audio_bytes, dtype=np.int16)
-
-        # Convert mono to stereo for pygame mixer
-        if audio_data.ndim == 1:
-            audio_data = np.column_stack((audio_data, audio_data))
-
-        # Create pygame sound and play
-        sound = pygame.sndarray.make_sound(audio_data)
-        channel = sound.play()
-
-        # If callback provided, monitor completion without blocking
-        if callback and channel:
-
-            def monitor_completion():
-                # Use pygame's channel monitoring instead of sleep
-                while channel.get_busy():
-                    pass  # Busy-wait loop is more responsive than sleep
-                callback()
-
-            threading.Thread(target=monitor_completion, daemon=True).start()
-
     def get_tools(self) -> List[types.Tool]:
-        """Get the available tools."""
+        """Gets the available tools.
+
+        Returns:
+            List[types.Tool]: A list of available tools.
+        """
         return [
             types.Tool(
                 function_declarations=[
@@ -636,7 +397,14 @@ class LLMManager:
         ]
 
     def execute_function(self, function_call: Any) -> Union[str, Dict[str, Any]]:
-        """Execute a function call from the model."""
+        """Executes a function call from the model.
+
+        Args:
+            function_call (Any): The function call to execute.
+
+        Returns:
+            Union[str, Dict[str, Any]]: The result of the function call.
+        """
         function_name = function_call.name
         args = function_call.args if hasattr(function_call, "args") else {}
 
@@ -697,61 +465,6 @@ class LLMManager:
         else:
             return f"Unknown function: {function_name}"
 
-    def start_conversation(self) -> None:
-        """Start the voice conversation with welcome flow (only once)."""
-        if not self.has_welcomed:
-            self.has_welcomed = True
-            # Brief greeting and readiness check
-            welcome_prompt = "Give a brief greeting like 'Welcome back, glad to see you again' or similar, then ask if they're ready to get started again and recommend headphones. Wait for their response before proceeding with any training."
-
-            # Generate and speak welcome message (handled internally now)
-            self.generate_with_gemini(welcome_prompt)
-
-        # Start the voice interaction loop
-        threading.Thread(target=self.voice_interaction_loop, daemon=True).start()
-
-    def voice_interaction_loop(self) -> None:
-        """Main voice interaction loop - continuous listening and responding."""
-        while True:
-            try:
-                # Wait for turn to be complete before starting new recording
-                self.turn_complete_event.wait()
-
-                # Double-check Kai isn't speaking
-                if self.kai_is_speaking:
-                    continue
-
-                # Record audio when voice is detected
-                audio_bytes = self.record_with_threshold()
-
-                if audio_bytes:
-                    # Transcribe the audio
-                    user_text = self.transcribe_audio(audio_bytes)
-
-                    if user_text.strip():
-                        print(f"User: {user_text}")
-
-                        # Generate response using Gemini
-                        # The new system handles TTS and tool execution internally
-                        self.generate_with_gemini(user_text)
-                    else:
-                        # Empty transcription - handle locally without sending to model
-                        print("Empty transcription detected.")
-
-                        def retry_turn():
-                            self._complete_turn()
-
-                        self.text_to_speech(
-                            "I couldn't make out what you're saying, please try again.",
-                            callback=retry_turn,
-                        )
-                else:
-                    print("No audio recorded.")
-
-            except KeyboardInterrupt:
-                print("\nConversation ended by user.")
-                self.text_to_speech("Goodbye! Great work today.")
-                break
-            except Exception as e:
-                print(f"Error in conversation loop: {e}")
-                continue
+    def stop(self):
+        """Stops the LLM manager."""
+        pass

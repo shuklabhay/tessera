@@ -4,35 +4,39 @@ import numpy as np
 
 
 class AudioVisualizer:
+    """Processes audio data to calculate a smoothed amplitude for visualization."""
+
     def __init__(self, window_size: int = 1024, smoothing: float = 0.9) -> None:
         self.window_size = window_size
         self.smoothing = smoothing
         self.current_amplitude = 0.0
 
     def process_audio(self, audio_data: Optional[bytes]) -> float:
-        """Process audio data to compute amplitude for visualization."""
+        """Processes a chunk of audio data and updates the smoothed amplitude.
+
+        Args:
+            audio_data: The input audio data in bytes, or None if no audio is received.
+
+        Returns:
+            The newly calculated and smoothed amplitude value as a float.
+        """
         if not audio_data:
-            # Apply decay when no audio
             self.current_amplitude *= 0.95
             return float(self.current_amplitude)
 
-        # Convert bytes to numpy array
         audio_data_np = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32)
-
-        # Calculate RMS amplitude (root mean square of samples)
         rms_amplitude = np.sqrt(np.mean(np.square(audio_data_np)))
-
-        # Normalize to 0–1 (16-bit signed range)
         normalized_amplitude = max(0.0, min(1.0, rms_amplitude / 32768.0))
-
-        # Exponential moving average smoothing
         self.current_amplitude = (
             self.smoothing * self.current_amplitude
             + (1.0 - self.smoothing) * normalized_amplitude
         )
-
         return float(self.current_amplitude)
 
     def get_current_amplitude(self) -> float:
-        """Get the current smoothed amplitude value."""
+        """Returns the current smoothed amplitude.
+
+        Returns:
+            The current smoothed amplitude value as a float.
+        """
         return self.current_amplitude

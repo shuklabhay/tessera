@@ -18,9 +18,9 @@
 
 ### Guided Discovery Process
 
-1. "Let's try an exercise" or "I'm going to play something - tell me what you think" (NEVER reveal audio type or content)
-2. Play audio clip without any explanation or preview
-3. Ask open-ended analytical questions: "What do you hear?", "What do you observe?", "Describe what's happening"
+1. **Initial Prompt**: "I'm going to play something for you" or "Let's try this" (never reveal audio type or content).
+2.  **Play Audio**: Use a tool to play an audio clip without any explanation.
+3.  **Follow-up Prompt**: After the audio finishes, ask an open-ended analytical question: "What did you hear?", "What did you observe?", or "Describe the sound you just heard."
 4. Compare user response to tool result description (your answer key)
 5. If accurate: provide positive reinforcement and advance
 6. If incomplete/inaccurate: give subtle hints, modify audio parameters, and repeat
@@ -173,17 +173,17 @@ Adapt training flow based on user responses. Each phase must be thoroughly explo
 
 ### Exercise Flow Pattern
 **For Every Exercise:**
-1. Clear previous audio state with stop_all_audio()
-2. Set up new audio scenario without explanation
-3. Say "Let's try an exercise" or similar non-revealing prompt
-4. Play audio and capture tool result descriptions
-5. Ask open-ended discovery questions
-6. Compare user responses to tool results (answer key)
-7. Provide feedback: praise accuracy or give directional hints
-8. Modify audio parameters to guide understanding
-9. Repeat until user description matches tool results
-10. Log successful identification with add_session_observation()
-11. Move to next variation only after mastery
+1. **Clear State**: `stop_all_audio()`
+2.  **Setup Scenario**: Use `play_*` tools to create a new audio scene.
+3.  **Initial Prompt**: Say "I'm going to play something for you" or a similar non-revealing prompt.
+4.  **Play Audio & Get Answer Key**: Execute the tool(s) and capture the result descriptions.
+5.  **Follow-up Prompt**: Ask an open-ended discovery question like "What did you hear?"
+6.  **Compare**: Check user's response against the tool result "answer key."
+7.  **Provide Feedback**: Praise accuracy or give directional hints for inaccuracy.
+8.  **Modify Audio**: Use tools to adjust parameters and guide understanding.
+9.  **Repeat**: Continue until the user's description matches the tool results.
+10. **Log Observation**: `add_session_observation()` with a summary of the skill.
+11. **Advance**: Move to the next variation only after mastery.
 
 ### Exhaustive Exploration Rules
 - Must test all variations within a phase before advancing

@@ -24,14 +24,23 @@ _CONTENT_CONFIG = types.GenerateContentConfig(
 
 
 def _find_audio_files() -> Iterator[pathlib.Path]:
-    """Yield absolute file paths for supported audio under AUDIO_DIR."""
+    """Yields absolute file paths for supported audio files found within the project's audio directory.
+
+    Returns:
+        An iterator of pathlib.Path objects for each found audio file.
+    """
     for path in AUDIO_DIR.rglob("*"):
         if path.suffix.lower() in AUDIO_EXTENSIONS and path.is_file():
             yield path
 
 
 def _ffmpeg_normalise(source: pathlib.Path, target: pathlib.Path) -> None:
-    """Resample to 24 kHz and normalise loudness to −12 LUFS."""
+    """Resamples the source audio file to 24 kHz and normalises its loudness to -12 LUFS, saving it to the target path.
+
+    Args:
+        source: The path to the input audio file.
+        target: The path where the normalised output audio file will be saved.
+    """
     cmd = [
         "ffmpeg",
         "-y",
@@ -49,16 +58,24 @@ def _ffmpeg_normalise(source: pathlib.Path, target: pathlib.Path) -> None:
 
 
 def _replace_file(original: pathlib.Path, tmp: pathlib.Path) -> None:
-    """Atomically replace original with tmp."""
+    """Atomically replaces the original file with the temporary file by moving it.
+
+    Args:
+        original: The path to the original file that will be replaced.
+        tmp: The path to the temporary file that will replace the original.
+    """
     shutil.move(str(tmp), str(original))
 
 
 def _prepare_audio_file(path: pathlib.Path) -> None:
-    """Normalise audio and regenerate description file."""
+    """Normalises a given audio file and generates a new text description file for it.
+
+    Args:
+        path: The path to the audio file to be prepared.
+    """
     tmp_path = path.with_suffix(TMP_SUFFIX)
     _ffmpeg_normalise(path, tmp_path)
 
-    # Read bytes from temp wav before replacing original file
     with open(tmp_path, "rb") as f:
         audio_bytes = f.read()
 
@@ -70,7 +87,14 @@ def _prepare_audio_file(path: pathlib.Path) -> None:
 
 
 def _generate_description(audio_bytes: bytes) -> str:
-    """Send audio bytes to Gemini and return a single-paragraph description."""
+    """Generates a single-paragraph text description for the given audio bytes using the Gemini API.
+
+    Args:
+        audio_bytes: The raw bytes of the audio file to be described.
+
+    Returns:
+        A string containing the generated description.
+    """
     contents = [
         types.Content(
             role="user",
@@ -87,7 +111,7 @@ def _generate_description(audio_bytes: bytes) -> str:
 
 
 def main() -> None:
-    """Entry point when running from command line."""
+    """Processes all audio files in the audio directory by normalising them and generating descriptions."""
     for audio_path in _find_audio_files():
         _prepare_audio_file(audio_path)
         print(f"✔ Processed {audio_path.relative_to(ROOT_DIR)}")
