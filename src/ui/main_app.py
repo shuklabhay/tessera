@@ -60,20 +60,23 @@ class MainLayout(FloatLayout):
             self.orb.glow_radius = self.orb.base_radius * 1.1
 
     def start_llm_manager(self, dt: float) -> None:
-        """Start the LLM manager on the main thread."""
+        """Start the LLM manager conversation loop in a separate thread."""
         if self.llm_manager:
-            self.llm_manager.start()
+            import threading
+            conversation_thread = threading.Thread(
+                target=self.llm_manager.start_conversation,
+                daemon=True
+            )
+            conversation_thread.start()
 
     def _handle_mute(self, is_muted: bool) -> None:
         """Handle mute state change."""
-        if self.llm_manager:
-            self.llm_manager.set_mute(is_muted)
+        # For the new implementation, mute functionality would need to be added
+        pass
 
     def _handle_pause(self, is_paused: bool) -> None:
         """Handle pause state change."""
-        if self.llm_manager:
-            self.llm_manager.set_pause(is_paused)
-
+        # For the new implementation, pause functionality would need to be added
         # Stop orb animations when paused
         if is_paused:
             Animation.cancel_all(self.orb)
@@ -81,23 +84,10 @@ class MainLayout(FloatLayout):
             self.orb.start_idle_animation(delay=0.1)
 
     def update_orb_from_audio(self, dt: float) -> None:
-        """Update orb visualization based on Kai's speech only."""
-        # Stop all orb movement when paused
-        if self.llm_manager and self.llm_manager.is_paused:
-            return
-
-        if not self.llm_manager:
-            self.orb.start_idle_animation(delay=0.5)
-            return
-
-        # Only move orb when Kai is actively speaking and not paused
-        if self.llm_manager.gemini_speaking and self.llm_manager.viz_queue:
-            audio_chunk = self.llm_manager.viz_queue.pop(0)
-            amplitude = self.audio_visualizer.process_audio(audio_chunk)
-            self.orb.update_from_amplitude(amplitude * 1.5)
-        else:
-            # Return to idle animation when Kai is not speaking
-            self.orb.start_idle_animation(delay=0.5)
+        """Update orb visualization based on audio activity."""
+        # For the new voice-based implementation, we'll use idle animation
+        # since we don't have the same audio streaming visualization
+        self.orb.start_idle_animation(delay=0.5)
 
 
 class TesseraApp(App):

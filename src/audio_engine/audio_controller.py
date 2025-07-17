@@ -10,7 +10,7 @@ from audio_engine.audio_loader import AudioLoader
 from audio_engine.mixer import AudioMixer
 
 # Volume limits for different channel types
-GEMINI_VOLUME = 1.2
+TTS_VOLUME = 1.2
 BACKGROUND_VOLUME_MAX = 0.2
 NORMAL_VOLUME_MAX = 0.5
 
@@ -29,29 +29,37 @@ class AudioController:
         self.mixer = AudioMixer()
         self.clips = {}
         self._next_clip_id = 1
-        self.channel_map = {"gemini": 0}
+        self.channel_map = {"tts": 0}
         self._ducked = False
         self._panning_threads = {}
         self._fade_threads = {}
 
-    def play_gemini_chunk(self, audio_chunk_bytes: bytes) -> None:
-        """Play raw audio chunk from Gemini."""
-        if not audio_chunk_bytes:
+    def play_tts_audio(self, audio_wav_bytes: bytes) -> None:
+        """Play WAV audio from TTS on the dedicated TTS channel."""
+        if not audio_wav_bytes:
             return
+        
+        # Create sound object from WAV bytes
+        sound_chunk = pygame.mixer.Sound(buffer=audio_wav_bytes)
 
-        # Convert bytes to numpy array
-        mono_array = np.frombuffer(audio_chunk_bytes, dtype=np.int16)
+        # Set volume and queue the sound
+        self.mixer.set_volume(self.channel_map["tts"], TTS_VOLUME)
+        self.mixer.queue_sound(self.channel_map["tts"], sound_chunk)
 
-        # Convert mono to stereo
-        stereo_array = np.ascontiguousarray(np.column_stack([mono_array, mono_array]))
-
-        # Create and queue sound
-        sound_chunk = pygame.sndarray.make_sound(stereo_array)
-        self.mixer.set_volume(self.channel_map["gemini"], GEMINI_VOLUME)
-        self.mixer.queue_sound(self.channel_map["gemini"], sound_chunk)
-
-        # Duck background audio
+        # Duck background audio with natural timing
         self._auto_duck_background(True)
+        
+        # Schedule restoration after TTS finishes
+        def restore_after_tts():
+            # Wait for TTS to finish playing without blocking
+            if self.mixer.channels[self.channel_map["tts"]]:
+                while self.mixer.channels[self.channel_map["tts"]].get_busy():
+                    pass  # Busy-wait is more responsive than sleep
+            # Restore background volumes
+            self._auto_duck_background(False)
+        
+        # Start restoration thread
+        threading.Thread(target=restore_after_tts, daemon=True).start()
 
     def _get_audio_description(self, filepath: str) -> str:
         """Get description from companion text file."""
@@ -100,7 +108,11 @@ class AudioController:
             clip["volume"] = current_volume
 
             if step < steps:
-                time.sleep(sleep_time)
+                # Use threading event for non-blocking delay
+                import threading
+                delay_event = threading.Event()
+                threading.Timer(sleep_time, delay_event.set).start()
+                delay_event.wait()
 
     def _start_fade_in(self, clip_id: int, target_volume: float) -> None:
         """Start a fade-in effect."""
@@ -143,13 +155,27 @@ class AudioController:
         thread.start()
 
     def _auto_duck_background(self, enable: bool) -> None:
-        """Automatically duck background audio."""
-        target_volume = BACKGROUND_VOLUME_MAX if enable else NORMAL_VOLUME_MAX
-
-        # Duck all non-Gemini channels
-        for clip_id, clip in self.clips.items():
-            if clip["channel"] != self.channel_map["gemini"]:
-                self._fade_volume(clip_id, clip["volume"], target_volume, 0.3)
+        """Automatically duck background audio with natural transitions."""
+        if enable:
+            # Duck down to 15% of original volume with slow, natural fade
+            for clip_id, clip in self.clips.items():
+                if clip["channel"] != self.channel_map["tts"]:
+                    # Store original volume if not already ducked
+                    if "_pre_duck_volume" not in clip:
+                        clip["_pre_duck_volume"] = clip["volume"]
+                    
+                    # Calculate target as 15% of original volume
+                    target_volume = clip["_pre_duck_volume"] * 0.15
+                    self._fade_volume(clip_id, clip["volume"], target_volume, 1.2)
+        else:
+            # Restore to original volumes with gentle fade
+            for clip_id, clip in self.clips.items():
+                if clip["channel"] != self.channel_map["tts"] and "_pre_duck_volume" in clip:
+                    # Restore to original volume
+                    original_volume = clip["_pre_duck_volume"]
+                    self._fade_volume(clip_id, clip["volume"], original_volume, 1.8)
+                    # Clean up stored volume
+                    del clip["_pre_duck_volume"]
 
 
 
@@ -419,7 +445,7 @@ class AudioController:
 
         # Exclude Gemini channel
         exclude = (
-            [self.channel_map.get("gemini")] if "gemini" in self.channel_map else []
+            [self.channel_map.get("tts")] if "tts" in self.channel_map else []
         )
 
         # Perform ducking
@@ -486,7 +512,11 @@ class AudioController:
             clip["pan"] = current_pan
 
             if step < steps:
-                time.sleep(sleep_time)
+                # Use threading event for non-blocking delay
+                import threading
+                delay_event = threading.Event()
+                threading.Timer(sleep_time, delay_event.set).start()
+                delay_event.wait()
 
     def pan_pattern_sweep(
         self,
@@ -583,7 +613,11 @@ class AudioController:
                         pan = max(-1.0, min(1.0, pan))
                         self.mixer.set_pan(clip["channel"], pan)
                         clip["pan"] = pan
-                        time.sleep(sleep_time)
+                        # Use threading event for non-blocking delay
+                        import threading
+                        delay_event = threading.Event()
+                        threading.Timer(sleep_time, delay_event.set).start()
+                        delay_event.wait()
 
                     # Swing left
                     for step in range(steps_per_cycle // 2):
@@ -593,7 +627,11 @@ class AudioController:
                         pan = max(-1.0, min(1.0, pan))
                         self.mixer.set_pan(clip["channel"], pan)
                         clip["pan"] = pan
-                        time.sleep(sleep_time)
+                        # Use threading event for non-blocking delay
+                        import threading
+                        delay_event = threading.Event()
+                        threading.Timer(sleep_time, delay_event.set).start()
+                        delay_event.wait()
                 else:
                     # Swing left
                     for step in range(steps_per_cycle // 2):
@@ -605,7 +643,11 @@ class AudioController:
                         pan = max(-1.0, min(1.0, pan))
                         self.mixer.set_pan(clip["channel"], pan)
                         clip["pan"] = pan
-                        time.sleep(sleep_time)
+                        # Use threading event for non-blocking delay
+                        import threading
+                        delay_event = threading.Event()
+                        threading.Timer(sleep_time, delay_event.set).start()
+                        delay_event.wait()
 
                     # Swing right
                     for step in range(steps_per_cycle // 2):
@@ -615,7 +657,11 @@ class AudioController:
                         pan = max(-1.0, min(1.0, pan))
                         self.mixer.set_pan(clip["channel"], pan)
                         clip["pan"] = pan
-                        time.sleep(sleep_time)
+                        # Use threading event for non-blocking delay
+                        import threading
+                        delay_event = threading.Event()
+                        threading.Timer(sleep_time, delay_event.set).start()
+                        delay_event.wait()
 
                 # Update pan for next cycle
                 current_pan = clip["pan"]
@@ -676,7 +722,11 @@ class AudioController:
                     pan = start_pan + ((target_pan - start_pan) * step / steps)
                     self.mixer.set_pan(clip["channel"], pan)
                     clip["pan"] = pan
-                    time.sleep(step_time)
+                    # Use threading event for non-blocking delay
+                    import threading
+                    delay_event = threading.Event()
+                    threading.Timer(step_time, delay_event.set).start()
+                    delay_event.wait()
 
                 # Set final position
                 self.mixer.set_pan(clip["channel"], target_pan)

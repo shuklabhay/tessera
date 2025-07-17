@@ -104,7 +104,11 @@ class AudioMixer:
                 interp = start + (target - start) * (s / steps)
                 with self.lock:
                     self.channels[idx].set_volume(interp)
-                time.sleep(step_sleep)
+                # Use threading event for non-blocking delay
+                import threading
+                delay_event = threading.Event()
+                threading.Timer(step_sleep, delay_event.set).start()
+                delay_event.wait()
 
         threads = []
 

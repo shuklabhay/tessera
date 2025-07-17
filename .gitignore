@@ -181,3 +181,4 @@ src/planning
 AGENTS.md
 src/prompts/progress.json
 /audio
+/models
