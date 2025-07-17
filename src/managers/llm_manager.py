@@ -61,9 +61,10 @@ class LLMManager:
 
         # Initialize Piper TTS
         self.tts_voice = PiperVoice.load(
-            "models/en_US-lessac-medium.onnx", "models/en_US-lessac-medium.onnx.json"
+            "models/en_US-hfc_male-medium.onnx",
+            "models/en_US-hfc_male-medium.onnx.json",
         )
-        self.syn_config = SynthesisConfig(length_scale=1.4)
+        self.syn_config = SynthesisConfig(length_scale=1.3)
 
         # Initialize pygame mixer for TTS playback
         pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)
@@ -368,11 +369,11 @@ class LLMManager:
 
         print(f"Kai: {text}")
 
-        # Generate audio with Piper using temporary file with 0.9 speed
+        # Generate audio with Piper using temporary file
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
             temp_path = temp_file.name
 
-        # Create WAV file object for Piper with speed control
+        # Create WAV file object for Piper
         with wave.open(temp_path, "wb") as wav_file:
             self.tts_voice.synthesize_wav(text, wav_file, syn_config=self.syn_config)
 
