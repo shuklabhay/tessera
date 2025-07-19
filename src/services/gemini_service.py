@@ -108,7 +108,7 @@ class GeminiService:
         )
 
         follow_up_response = self.client.models.generate_content(
-            model="gemini-2.5-flash-lite",
+            model="gemini-2.5-flash",
             contents=self.conversation_history,
             config=generation_config,
         )

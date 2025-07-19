@@ -87,16 +87,28 @@ class LLMManager:
         self.turn_complete_event.clear()
 
         if response_text and tool_calls:
-            self.tts_service.text_to_speech(
-                response_text,
-                callback=lambda: self._execute_tools_and_follow_up(tool_calls),
-            )
+            self._execute_tools_during_speech(response_text, tool_calls)
         elif response_text:
             self.tts_service.text_to_speech(response_text, callback=self._complete_turn)
         elif tool_calls:
             self._execute_tools_and_follow_up(tool_calls)
         else:
             self._complete_turn()
+
+    def _execute_tools_during_speech(self, response_text: str, tool_calls: List[Any]) -> None:
+        """Executes tools immediately while speech is playing, not after.
+
+        Args:
+            response_text (str): The text to speak
+            tool_calls (List[Any]): A list of tool calls to execute during speech.
+        """
+        def execute_tools_immediately():
+            for tool_call in tool_calls:
+                result = self.execute_function(tool_call)
+                print(f"Tool executed during speech: {tool_call.name} -> {result}")
+        
+        threading.Thread(target=execute_tools_immediately, daemon=True).start()
+        self.tts_service.text_to_speech(response_text, callback=self._complete_turn)
 
     def _execute_tools_and_follow_up(self, tool_calls: List[Any]) -> None:
         """Executes tools and generates a follow-up response.
