@@ -79,6 +79,7 @@ class ControlOverlay(FloatLayout):
     def _on_control_press(self, button: Button) -> None:
         """
         Handles the press event for the main control button.
+
         Args:
             button (Button): The button instance that was pressed.
         """
@@ -90,6 +91,7 @@ class ControlOverlay(FloatLayout):
     def _on_pause_press(self, button: Button) -> None:
         """
         Handles the press event for the pause button.
+
         Args:
             button (Button): The button instance that was pressed.
         """

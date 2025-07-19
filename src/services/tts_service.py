@@ -32,26 +32,20 @@ class TextToSpeechService:
 
         print(f"Kai: {text}")
 
-        # Synthesize audio to an in-memory buffer
         wav_buffer = io.BytesIO()
         with wave.open(wav_buffer, "wb") as wav_file:
             self.tts_voice.synthesize_wav(text, wav_file, syn_config=self.syn_config)
 
-        # Reset buffer position to the beginning to read from it
         wav_buffer.seek(0)
 
-        # Read audio data from the in-memory buffer
         with wave.open(wav_buffer, "rb") as wav_file:
             audio_bytes = wav_file.readframes(wav_file.getnframes())
 
-        # Convert to numpy array for pygame
         audio_data = np.frombuffer(audio_bytes, dtype=np.int16)
 
-        # Convert mono to stereo for pygame mixer
         if audio_data.ndim == 1:
             audio_data = np.column_stack((audio_data, audio_data))
 
-        # Create pygame sound and play
         sound = pygame.sndarray.make_sound(audio_data)
         channel = sound.play()
 

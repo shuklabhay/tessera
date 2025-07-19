@@ -12,8 +12,7 @@ class StateManager:
         self.progress_file = (repo_root / progress_file).resolve()
 
     def _read_state(self) -> Dict[str, Any]:
-        """
-        Reads state from progress file, initializing if empty.
+        """Reads state from progress file, initializing if empty.
 
         Returns:
             Dict[str, Any]: The application state.
@@ -33,8 +32,7 @@ class StateManager:
         return json.loads(content)
 
     def _write_state(self, state: Dict[str, Any]) -> None:
-        """
-        Writes the provided state to the progress file.
+        """Writes the provided state to the progress file.
 
         Args:
             state (Dict[str, Any]): The state to persist.
@@ -43,8 +41,7 @@ class StateManager:
             json.dump(state, f, indent=2)
 
     def is_first_run(self) -> bool:
-        """
-        Checks if this is the first run of the application.
+        """Checks if this is the first run of the application.
 
         Returns:
             bool: True if no sessions are recorded, otherwise False.
@@ -53,8 +50,7 @@ class StateManager:
         return state.get("sessions") == []
 
     def update_progress(self, new_observation: str) -> None:
-        """
-        Adds a new observation to the current session.
+        """Adds a new observation to the current session.
 
         Args:
             new_observation (str): The observation to add.
@@ -69,8 +65,7 @@ class StateManager:
         self._write_state(state)
 
     def get_context_summary(self) -> str:
-        """
-        Generates a summary of recent sessions.
+        """Generates a summary of recent sessions.
 
         Returns:
             str: A summary of the last 5 sessions.
@@ -86,8 +81,7 @@ class StateManager:
         return "\n".join(lines)
 
     def get_full_progress(self) -> str:
-        """
-        Returns the complete progress data as a JSON string.
+        """Returns the complete progress data as a JSON string.
 
         Returns:
             str: The entire state as a JSON string.
@@ -95,8 +89,7 @@ class StateManager:
         return json.dumps(self._read_state(), indent=2)
 
     def update_field(self, field: str, value: Any) -> str:
-        """
-        Updates a top-level field in the state.
+        """Updates a top-level field in the state.
 
         Args:
             field (str): The field to update.

@@ -25,8 +25,8 @@ class AudioMixer:
         loops: int = 0,
         volume: float = 1.0,
     ) -> None:
-        """
-        Plays a sound on a specified channel.
+        """Plays a sound on a specified channel.
+
         Args:
             sound: The sound to play.
             channel_idx: The index of the channel to play the sound on.
@@ -39,8 +39,8 @@ class AudioMixer:
             ch.play(sound, loops=loops)
 
     def queue_sound(self, channel_idx: int, sound: pygame.mixer.Sound) -> None:
-        """
-        Queues a sound on a channel or plays it immediately if the channel is free.
+        """Queues a sound on a channel or plays it immediately if the channel is free.
+
         Args:
             channel_idx: The index of the channel to queue the sound on.
             sound: The sound to queue.
@@ -53,8 +53,8 @@ class AudioMixer:
                 ch.queue(sound)
 
     def stop(self, channel_idx: int) -> None:
-        """
-        Stops playback on a specified channel.
+        """Stops playback on a specified channel.
+
         Args:
             channel_idx: The index of the channel to stop.
         """
@@ -63,8 +63,8 @@ class AudioMixer:
                 self.channels[channel_idx].stop()
 
     def set_volume(self, channel_idx: int, volume: float) -> None:
-        """
-        Sets the volume for a specified channel.
+        """Sets the volume for a specified channel.
+
         Args:
             channel_idx: The index of the channel to set the volume for.
             volume: The volume to set.
@@ -74,8 +74,8 @@ class AudioMixer:
                 self.channels[channel_idx].set_volume(volume)
 
     def set_pan(self, channel_idx: int, pan: float) -> None:
-        """
-        Sets the stereo panning for a specified channel.
+        """Sets the stereo panning for a specified channel.
+
         Args:
             channel_idx: The index of the channel to set the pan for.
             pan: The panning value, from -1.0 (left) to 1.0 (right).
@@ -91,10 +91,11 @@ class AudioMixer:
                 )
 
     def is_playing(self, channel_idx: int) -> bool:
-        """
-        Checks if a specified channel is currently playing a sound.
+        """Checks if a specified channel is currently playing a sound.
+
         Args:
             channel_idx: The index of the channel to check.
+
         Returns:
             True if the channel is playing, False otherwise.
         """
@@ -109,8 +110,8 @@ class AudioMixer:
                 ch.stop()
 
     def get_free_channel_index(self) -> int:
-        """
-        Returns the index of the first free channel, or expands the mixer if all are busy.
+        """Returns the index of the first free channel, or expands the mixer if all are busy.
+
         Returns:
             The index of a free channel.
         """
@@ -125,12 +126,13 @@ class AudioMixer:
     def duck_channels(
         self, enable: bool, factor: float = 0.3, exclude: Optional[List[int]] = None
     ) -> Dict[int, float]:
-        """
-        Ducks the volume of channels to help another track be heard more clearly.
+        """Ducks the volume of channels to help another track be heard more clearly.
+
         Args:
             enable: Whether to enable or disable ducking.
             factor: The factor to reduce the volume by.
             exclude: A list of channel indices to exclude from ducking.
+
         Returns:
             A dictionary of the updated channel volumes.
         """

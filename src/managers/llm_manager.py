@@ -29,7 +29,6 @@ class LLMManager:
         self.audio_controller = audio_controller
         self.state_manager = state_manager
 
-        # Initialize services
         self.recording_service = RecordingService()
         self.transcription_service = TranscriptionService()
         self.tts_service = TextToSpeechService(
@@ -40,10 +39,9 @@ class LLMManager:
             state_manager=self.state_manager, tools=self.get_tools()
         )
 
-        # Conversation state
         self.has_welcomed = False
         self.turn_complete_event = threading.Event()
-        self.turn_complete_event.set()  # Initially ready for user input
+        self.turn_complete_event.set()
 
     def start_conversation(self) -> None:
         """Starts the voice conversation with a welcome flow."""

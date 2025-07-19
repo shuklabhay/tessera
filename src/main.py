@@ -5,7 +5,6 @@ import ssl
 import certifi
 from dotenv import load_dotenv
 
-# Disable debug logging
 os.environ["KIVY_LOG_LEVEL"] = "warning"
 logging.getLogger().setLevel(logging.WARNING)
 logging.getLogger("websockets").setLevel(logging.WARNING)

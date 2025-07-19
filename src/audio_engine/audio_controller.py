@@ -9,7 +9,6 @@ import pygame
 from audio_engine.audio_loader import AudioLoader
 from audio_engine.mixer import AudioMixer
 
-# Volume limits for different channel types
 TTS_VOLUME = 1.2
 BACKGROUND_VOLUME_MAX = 0.2
 NORMAL_VOLUME_MAX = 0.5
@@ -38,27 +37,22 @@ class AudioController:
         """Play WAV audio from TTS on the dedicated TTS channel."""
         if not audio_wav_bytes:
             return
-        
-        # Create sound object from WAV bytes
+
         sound_chunk = pygame.mixer.Sound(buffer=audio_wav_bytes)
 
-        # Set volume and queue the sound
         self.mixer.set_volume(self.channel_map["tts"], TTS_VOLUME)
         self.mixer.queue_sound(self.channel_map["tts"], sound_chunk)
 
-        # Duck background audio with natural timing
         self._auto_duck_background(True)
-        
-        # Schedule restoration after TTS finishes
+
         def restore_after_tts():
-            # Wait for TTS to finish playing without blocking
+
             if self.mixer.channels[self.channel_map["tts"]]:
                 while self.mixer.channels[self.channel_map["tts"]].get_busy():
-                    pass  # Busy-wait is more responsive than sleep
-            # Restore background volumes
+                    pass
+
             self._auto_duck_background(False)
-        
-        # Start restoration thread
+
         threading.Thread(target=restore_after_tts, daemon=True).start()
 
     def _get_audio_description(self, filepath: str) -> str:
@@ -66,12 +60,10 @@ class AudioController:
         if not filepath:
             return "No description available."
 
-        # Look for description file
         dir_name, file_name = os.path.split(filepath)
         base_name, _ = os.path.splitext(file_name)
         desc_path = os.path.join(dir_name, f"{base_name}.txt")
 
-        # Read description
         if os.path.exists(desc_path):
             with open(desc_path, "r") as f:
                 return f.read().strip()
@@ -88,13 +80,11 @@ class AudioController:
         if clip_id not in self.clips:
             return
 
-        # Calculate fade parameters
         clip = self.clips[clip_id]
         steps = 20
         sleep_time = duration / steps
         step_size = (end_volume - start_volume) / steps
 
-        # Apply fade
         for step in range(steps + 1):
             if clip_id in self._fade_threads and self._fade_threads[clip_id].get(
                 "stop", False
@@ -108,8 +98,9 @@ class AudioController:
             clip["volume"] = current_volume
 
             if step < steps:
-                # Use threading event for non-blocking delay
+
                 import threading
+
                 delay_event = threading.Event()
                 threading.Timer(sleep_time, delay_event.set).start()
                 delay_event.wait()
@@ -119,7 +110,6 @@ class AudioController:
         if clip_id in self._fade_threads:
             self._fade_threads[clip_id]["stop"] = True
 
-        # Create and start fade thread
         thread_info = {"stop": False}
         thread = threading.Thread(
             target=self._fade_volume,
@@ -138,17 +128,14 @@ class AudioController:
         if clip_id in self._fade_threads:
             self._fade_threads[clip_id]["stop"] = True
 
-        # Get current volume
         current_volume = self.clips[clip_id]["volume"]
         thread_info = {"stop": False}
 
-        # Define fade and callback
         def fade_and_callback():
             self._fade_volume(clip_id, current_volume, 0.0, 0.5)
             if callback:
                 callback()
 
-        # Create and start fade thread
         thread = threading.Thread(target=fade_and_callback, daemon=True)
         thread_info["thread"] = thread
         self._fade_threads[clip_id] = thread_info
@@ -157,49 +144,46 @@ class AudioController:
     def _auto_duck_background(self, enable: bool) -> None:
         """Automatically duck background audio with natural transitions."""
         if enable:
-            # Duck down to 15% of original volume with slow, natural fade
+
             for clip_id, clip in self.clips.items():
                 if clip["channel"] != self.channel_map["tts"]:
-                    # Store original volume if not already ducked
+
                     if "_pre_duck_volume" not in clip:
                         clip["_pre_duck_volume"] = clip["volume"]
-                    
-                    # Calculate target as 15% of original volume
+
                     target_volume = clip["_pre_duck_volume"] * 0.15
                     self._fade_volume(clip_id, clip["volume"], target_volume, 1.2)
         else:
-            # Restore to original volumes with gentle fade
+
             for clip_id, clip in self.clips.items():
-                if clip["channel"] != self.channel_map["tts"] and "_pre_duck_volume" in clip:
-                    # Restore to original volume
+                if (
+                    clip["channel"] != self.channel_map["tts"]
+                    and "_pre_duck_volume" in clip
+                ):
+
                     original_volume = clip["_pre_duck_volume"]
                     self._fade_volume(clip_id, clip["volume"], original_volume, 1.8)
-                    # Clean up stored volume
+
                     del clip["_pre_duck_volume"]
-
-
 
     def play_environmental_sound(
         self, volume: float = 0.7
     ) -> Union[str, Dict[str, Any]]:
         """Play a random environmental sound."""
-        # Set volume and get audio
+
         target_volume = max(0.0, min(NORMAL_VOLUME_MAX, volume))
         audio, filepath = self.loader.get_cached_audio("environmental")
         if audio is not None:
-            # Convert for pygame
+
             audio_array = np.ascontiguousarray((audio * 32767).astype(np.int16))
             sound = pygame.sndarray.make_sound(audio_array)
 
-            # Allocate channel
             channel = self._get_free_non_reserved_channel()
             if channel is None:
                 return "No free audio channels available"
 
-            # Start playing at zero volume
             self.mixer.play(sound, channel, loops=-1, volume=0.0)
 
-            # Create clip metadata
             description = self._get_audio_description(filepath)
             clip_id = self._next_clip_id
             self._next_clip_id += 1
@@ -211,7 +195,6 @@ class AudioController:
                 "description": description,
             }
 
-            # Start fade-in effect
             self._start_fade_in(clip_id, target_volume)
 
             return {
@@ -223,23 +206,20 @@ class AudioController:
 
     def play_speaker_sound(self, volume: float = 0.7) -> Union[str, Dict[str, Any]]:
         """Play a random speaker sound."""
-        # Set volume and get audio
+
         target_volume = max(0.0, min(NORMAL_VOLUME_MAX, volume))
         audio, filepath = self.loader.get_cached_audio("speakers")
         if audio is not None:
-            # Convert for pygame
+
             audio_array = np.ascontiguousarray((audio * 32767).astype(np.int16))
             sound = pygame.sndarray.make_sound(audio_array)
 
-            # Allocate channel
             channel = self._get_free_non_reserved_channel()
             if channel is None:
                 return "No free audio channels available"
 
-            # Start playing at zero volume
             self.mixer.play(sound, channel, loops=-1, volume=0.0)
 
-            # Create clip metadata
             description = self._get_audio_description(filepath)
             clip_id = self._next_clip_id
             self._next_clip_id += 1
@@ -251,7 +231,6 @@ class AudioController:
                 "description": description,
             }
 
-            # Start fade-in effect
             self._start_fade_in(clip_id, target_volume)
 
             return {"clip_id": clip_id, "description": description, "type": "speakers"}
@@ -259,23 +238,20 @@ class AudioController:
 
     def play_noise_sound(self, volume: float = 0.7) -> Union[str, Dict[str, Any]]:
         """Play a random noise sound."""
-        # Set volume and get audio
+
         target_volume = max(0.0, min(NORMAL_VOLUME_MAX, volume))
         audio, filepath = self.loader.get_cached_audio("noise")
         if audio is not None:
-            # Convert for pygame
+
             audio_array = np.ascontiguousarray((audio * 32767).astype(np.int16))
             sound = pygame.sndarray.make_sound(audio_array)
 
-            # Allocate channel
             channel = self._get_free_non_reserved_channel()
             if channel is None:
                 return "No free audio channels available"
 
-            # Start playing at zero volume
             self.mixer.play(sound, channel, loops=-1, volume=0.0)
 
-            # Create clip metadata
             description = self._get_audio_description(filepath)
             clip_id = self._next_clip_id
             self._next_clip_id += 1
@@ -287,7 +263,6 @@ class AudioController:
                 "description": description,
             }
 
-            # Start fade-in effect
             self._start_fade_in(clip_id, target_volume)
 
             return {"clip_id": clip_id, "description": description, "type": "noise"}
@@ -295,23 +270,20 @@ class AudioController:
 
     def play_alert_sound(self, volume: float = 0.7) -> Union[str, Dict[str, Any]]:
         """Play a random alert sound."""
-        # Set volume and get audio
+
         target_volume = max(0.0, min(NORMAL_VOLUME_MAX, volume))
         audio, filepath = self.loader.get_cached_audio("alerts")
         if audio is not None:
-            # Convert for pygame
+
             audio_array = np.ascontiguousarray((audio * 32767).astype(np.int16))
             sound = pygame.sndarray.make_sound(audio_array)
 
-            # Allocate channel
             channel = self._get_free_non_reserved_channel()
             if channel is None:
                 return "No free audio channels available"
 
-            # Start playing at zero volume
             self.mixer.play(sound, channel, loops=0, volume=0.0)
 
-            # Create clip metadata
             description = self._get_audio_description(filepath)
             clip_id = self._next_clip_id
             self._next_clip_id += 1
@@ -323,7 +295,6 @@ class AudioController:
                 "description": description,
             }
 
-            # Start fade-in effect
             self._start_fade_in(clip_id, target_volume)
 
             return {"clip_id": clip_id, "description": description, "type": "alerts"}
@@ -384,7 +355,7 @@ class AudioController:
                 cid for cid, m in self.clips.items() if m["type"] == audio_type
             ]
             for cid in to_remove:
-                # Fade out and stop
+
                 def stop_callback(clip_id=cid):
                     if clip_id in self.clips:
                         self.mixer.stop(self.clips[clip_id]["channel"])
@@ -415,11 +386,10 @@ class AudioController:
 
     def stop_all_audio(self) -> str:
         """Stop all active audio streams."""
-        # Stop all panning patterns
+
         for cid in list(self._panning_threads.keys()):
             self._stop_panning_thread(cid)
 
-        # Fade out all non-Gemini clips
         clips_to_fade = []
         for cid, clip in self.clips.items():
             if clip["channel"] != self.channel_map.get("gemini"):
@@ -443,15 +413,10 @@ class AudioController:
         if (enable and self._ducked) or (not enable and not self._ducked):
             return
 
-        # Exclude Gemini channel
-        exclude = (
-            [self.channel_map.get("tts")] if "tts" in self.channel_map else []
-        )
+        exclude = [self.channel_map.get("tts")] if "tts" in self.channel_map else []
 
-        # Perform ducking
         updated = self.mixer.duck_channels(enable, factor, exclude=exclude)
 
-        # Sync metadata
         for _, meta in self.clips.items():
             ch_idx = meta["channel"]
             if ch_idx in updated:
@@ -494,13 +459,11 @@ class AudioController:
         if not clip:
             return
 
-        # Calculate transition parameters
         sleep_time = duration_seconds / steps
         step_size = (end_pan - start_pan) / steps
 
         thread_info = self._panning_threads.get(clip_id, {})
 
-        # Apply transition
         for step in range(steps + 1):
             if thread_info.get("stop", False):
                 break
@@ -512,8 +475,9 @@ class AudioController:
             clip["pan"] = current_pan
 
             if step < steps:
-                # Use threading event for non-blocking delay
+
                 import threading
+
                 delay_event = threading.Event()
                 threading.Timer(sleep_time, delay_event.set).start()
                 delay_event.wait()
@@ -533,10 +497,8 @@ class AudioController:
         if cid_int not in self.clips:
             return f"Unknown clip_id {clip_id}."
 
-        # Stop existing panning
         self._stop_panning_thread(cid_int)
 
-        # Set duration
         speed_durations = {"slow": 10.0, "moderate": 5.0, "fast": 2.0}
         if isinstance(speed, str) and speed in speed_durations:
             duration = speed_durations[speed]
@@ -545,10 +507,8 @@ class AudioController:
         else:
             duration = 5.0
 
-        # Get current pan
         current_pan = self.clips[cid_int]["pan"]
 
-        # Set start and end positions
         if direction == "left_to_right":
             start_pan, end_pan = current_pan, 1.0
         elif direction == "right_to_left":
@@ -558,7 +518,6 @@ class AudioController:
         else:
             start_pan, end_pan = current_pan, 1.0
 
-        # Create and start panning thread
         thread_info = {"stop": False}
         thread = threading.Thread(
             target=self._smooth_pan_transition,
@@ -583,7 +542,6 @@ class AudioController:
         if cid_int not in self.clips:
             return f"Unknown clip_id {clip_id}."
 
-        # Stop existing panning
         self._stop_panning_thread(cid_int)
 
         def pendulum_motion() -> None:
@@ -591,7 +549,6 @@ class AudioController:
             if not clip:
                 return
 
-            # Set parameters
             thread_info = self._panning_threads.get(cid_int, {})
             steps_per_cycle = 40
             sleep_time = duration_per_cycle / steps_per_cycle
@@ -601,9 +558,8 @@ class AudioController:
                 if thread_info.get("stop", False):
                     break
 
-                # Determine swing direction
                 if current_pan <= 0:
-                    # Swing right
+
                     for step in range(steps_per_cycle // 2):
                         if thread_info.get("stop", False):
                             break
@@ -613,13 +569,13 @@ class AudioController:
                         pan = max(-1.0, min(1.0, pan))
                         self.mixer.set_pan(clip["channel"], pan)
                         clip["pan"] = pan
-                        # Use threading event for non-blocking delay
+
                         import threading
+
                         delay_event = threading.Event()
                         threading.Timer(sleep_time, delay_event.set).start()
                         delay_event.wait()
 
-                    # Swing left
                     for step in range(steps_per_cycle // 2):
                         if thread_info.get("stop", False):
                             break
@@ -627,13 +583,14 @@ class AudioController:
                         pan = max(-1.0, min(1.0, pan))
                         self.mixer.set_pan(clip["channel"], pan)
                         clip["pan"] = pan
-                        # Use threading event for non-blocking delay
+
                         import threading
+
                         delay_event = threading.Event()
                         threading.Timer(sleep_time, delay_event.set).start()
                         delay_event.wait()
                 else:
-                    # Swing left
+
                     for step in range(steps_per_cycle // 2):
                         if thread_info.get("stop", False):
                             break
@@ -643,13 +600,13 @@ class AudioController:
                         pan = max(-1.0, min(1.0, pan))
                         self.mixer.set_pan(clip["channel"], pan)
                         clip["pan"] = pan
-                        # Use threading event for non-blocking delay
+
                         import threading
+
                         delay_event = threading.Event()
                         threading.Timer(sleep_time, delay_event.set).start()
                         delay_event.wait()
 
-                    # Swing right
                     for step in range(steps_per_cycle // 2):
                         if thread_info.get("stop", False):
                             break
@@ -657,16 +614,15 @@ class AudioController:
                         pan = max(-1.0, min(1.0, pan))
                         self.mixer.set_pan(clip["channel"], pan)
                         clip["pan"] = pan
-                        # Use threading event for non-blocking delay
+
                         import threading
+
                         delay_event = threading.Event()
                         threading.Timer(sleep_time, delay_event.set).start()
                         delay_event.wait()
 
-                # Update pan for next cycle
                 current_pan = clip["pan"]
 
-        # Create and start thread
         thread_info = {"stop": False}
         thread = threading.Thread(target=pendulum_motion, daemon=True)
         thread_info["thread"] = thread
@@ -687,7 +643,6 @@ class AudioController:
         if cid_int not in self.clips:
             return f"Unknown clip_id {clip_id}."
 
-        # Stop existing panning
         self._stop_panning_thread(cid_int)
 
         def alternating_motion() -> None:
@@ -695,11 +650,9 @@ class AudioController:
             if not clip:
                 return
 
-            # Set parameters
             thread_info = self._panning_threads.get(cid_int, {})
             current_pan = clip["pan"]
 
-            # Choose start position
             if current_pan <= 0:
                 positions = [0.8, -0.8]
             else:
@@ -711,7 +664,6 @@ class AudioController:
 
                 target_pan = positions[cycle % 2]
 
-                # Smoothly transition to target
                 steps = 10
                 step_time = interval / steps
                 start_pan = clip["pan"]
@@ -722,17 +674,16 @@ class AudioController:
                     pan = start_pan + ((target_pan - start_pan) * step / steps)
                     self.mixer.set_pan(clip["channel"], pan)
                     clip["pan"] = pan
-                    # Use threading event for non-blocking delay
+
                     import threading
+
                     delay_event = threading.Event()
                     threading.Timer(step_time, delay_event.set).start()
                     delay_event.wait()
 
-                # Set final position
                 self.mixer.set_pan(clip["channel"], target_pan)
                 clip["pan"] = target_pan
 
-        # Create and start thread
         thread_info = {"stop": False}
         thread = threading.Thread(target=alternating_motion, daemon=True)
         thread_info["thread"] = thread
@@ -751,10 +702,8 @@ class AudioController:
         if cid_int not in self.clips:
             return f"Unknown clip_id {clip_id}."
 
-        # Stop existing panning
         self._stop_panning_thread(cid_int)
 
-        # Map side to pan value
         side_map = {
             "left": -0.8,
             "right": 0.8,
@@ -765,11 +714,9 @@ class AudioController:
             "slight_right": 0.3,
         }
 
-        # Set pan values
         target_pan = side_map.get(side.lower(), 0.0)
         current_pan = self.clips[cid_int]["pan"]
 
-        # Create and start thread
         thread_info = {"stop": False}
         thread = threading.Thread(
             target=self._smooth_pan_transition,
@@ -792,7 +739,7 @@ class AudioController:
             except (ValueError, TypeError):
                 return f"Invalid clip_id {clip_id}"
         else:
-            # Stop all panning
+
             for cid in list(self._panning_threads.keys()):
                 self._stop_panning_thread(cid)
             return "Stopped all panning patterns"

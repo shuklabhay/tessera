@@ -10,7 +10,12 @@ import sounddevice as sd
 class RecordingService:
     """Handles audio recording with silence detection."""
 
-    def __init__(self, sample_rate: int = 16000, threshold: float = 0.01, silence_duration: float = 1.5):
+    def __init__(
+        self,
+        sample_rate: int = 16000,
+        threshold: float = 0.01,
+        silence_duration: float = 1.5,
+    ):
         self.sample_rate = sample_rate
         self.threshold = threshold
         self.silence_duration = silence_duration
@@ -56,7 +61,9 @@ class RecordingService:
                 self.audio_buffer.extend(indata.flatten())
                 if self.silence_start_time is None:
                     self.silence_start_time = time_module.time()
-                elif time_module.time() - self.silence_start_time > self.silence_duration:
+                elif (
+                    time_module.time() - self.silence_start_time > self.silence_duration
+                ):
                     print("Silence detected, stopping recording...")
                     self.recording_complete = True
 
