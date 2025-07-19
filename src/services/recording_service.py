@@ -2,28 +2,31 @@ import io
 import threading
 import time as time_module
 import wave
+from typing import List, Optional
 
 import numpy as np
 import sounddevice as sd
 
 
 class RecordingService:
-    """Handles audio recording with silence detection."""
+    """
+    Handles audio recording with silence detection.
+    """
 
     def __init__(
         self,
         sample_rate: int = 16000,
         threshold: float = 0.01,
         silence_duration: float = 1.5,
-    ):
-        self.sample_rate = sample_rate
-        self.threshold = threshold
-        self.silence_duration = silence_duration
-        self.is_recording = False
-        self.audio_buffer = []
-        self.silence_start_time = None
-        self.recording_complete = False
-        self.kai_is_speaking = False
+    ) -> None:
+        self.sample_rate: int = sample_rate
+        self.threshold: float = threshold
+        self.silence_duration: float = silence_duration
+        self.is_recording: bool = False
+        self.audio_buffer: List[float] = []
+        self.silence_start_time: Optional[float] = None
+        self.recording_complete: bool = False
+        self.kai_is_speaking: bool = False
 
     def record_with_threshold(self) -> bytes:
         """Records audio when a voice is detected and stops after a period of silence.
@@ -40,7 +43,7 @@ class RecordingService:
         self.silence_start_time = None
         self.recording_complete = False
 
-        def audio_callback(indata, frames, time, status):
+        def audio_callback(indata, outdata, frames, time, status):
             if status:
                 print(f"Audio status: {status}")
 

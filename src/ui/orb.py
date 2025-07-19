@@ -8,7 +8,9 @@ from kivy.uix.widget import Widget
 
 
 class Orb(Widget):
-    """A visual orb that responds to audio and user interaction."""
+    """
+    A visual orb that responds to audio and user interaction.
+    """
 
     size_multiplier = NumericProperty(1.0)
     base_radius = NumericProperty(100)
@@ -26,16 +28,14 @@ class Orb(Widget):
             self.orb_color_instr = Color(*self.orb_color)
             self.orb = Ellipse(pos=(0, 0), size=(0, 0))
 
-        Clock.schedule_interval(self.update_graphics, 1 / 60)
+        Clock.schedule_interval(lambda dt: self.update_graphics(), 1 / 60)
         self.anim = None
         self.idle_anim = None
         self.start_idle_animation()
 
-    def update_graphics(self, dt: float) -> None:
-        """Updates the orb's position and size for the current frame.
-
-        Args:
-            dt (float): The time elapsed since the last update.
+    def update_graphics(self) -> None:
+        """
+        Updates the orb's position and size for the current frame.
         """
         orb_size = self.base_radius * 2 * self.size_multiplier
         glow_size = self.glow_radius * 2 * self.size_multiplier
@@ -78,13 +78,11 @@ class Orb(Widget):
         if self.idle_anim is not None:
             self.idle_anim.cancel(self)
 
-        Clock.schedule_once(self._begin_idle_animation, delay)
+        Clock.schedule_once(lambda dt: self._begin_idle_animation(), delay)
 
-    def _begin_idle_animation(self, dt: float) -> None:
-        """Sets up and starts the repeating breathing animation for the idle state.
-
-        Args:
-            dt (float): The time elapsed since the animation was scheduled.
+    def _begin_idle_animation(self) -> None:
+        """
+        Sets up and starts the repeating breathing animation for the idle state.
         """
         idle_size_min = 0.97
         idle_size_max = 1.03

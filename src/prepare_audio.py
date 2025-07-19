@@ -111,7 +111,9 @@ def _generate_description(audio_bytes: bytes) -> str:
 
 
 def main() -> None:
-    """Processes all audio files in the audio directory by normalising them and generating descriptions."""
+    """
+    Processes all audio files in the audio directory by normalising them and generating descriptions.
+    """
     for audio_path in _find_audio_files():
         _prepare_audio_file(audio_path)
         print(f"✔ Processed {audio_path.relative_to(ROOT_DIR)}")

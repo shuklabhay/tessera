@@ -5,7 +5,9 @@ from typing import Any, Dict
 
 
 class StateManager:
-    """Manages the state of the application, including progress and session data."""
+    """
+    Manages the state of the application, including progress and session data.
+    """
 
     def __init__(self, progress_file: str = "src/prompts/progress.json") -> None:
         repo_root = Path(__file__).resolve().parents[2]

@@ -9,9 +9,11 @@ from piper import PiperVoice, SynthesisConfig
 
 
 class TextToSpeechService:
-    """Handles text-to-speech conversion and playback."""
+    """
+    Handles text-to-speech conversion and playback.
+    """
 
-    def __init__(self, model_path: str, config_path: str):
+    def __init__(self, model_path: str, config_path: str) -> None:
         self.tts_voice = PiperVoice.load(model_path, config_path)
         self.syn_config = SynthesisConfig(length_scale=1.5, noise_scale=0.333)
         pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)

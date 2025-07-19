@@ -5,7 +5,9 @@ from faster_whisper import WhisperModel
 
 
 class TranscriptionService:
-    """Handles audio transcription using the Whisper model."""
+    """
+    Handles audio transcription using the Whisper model.
+    """
 
     def __init__(
         self, model_size: str = "tiny", device: str = "cpu", compute_type: str = "int8"

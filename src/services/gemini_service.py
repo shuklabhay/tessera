@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List
+from typing import Dict, List
 
 import google.genai as genai
 from google.genai import types
@@ -8,7 +8,8 @@ from managers.state_manager import StateManager
 
 
 def load_system_prompt() -> str:
-    """Loads the system prompt from a file.
+    """
+    Loads the system prompt from a file.
 
     Returns:
         str: The system prompt.
@@ -21,31 +22,35 @@ def load_system_prompt() -> str:
 
 
 class GeminiService:
-    """Handles all communication with the Gemini LLM."""
+    """
+    Handles all communication with the Gemini LLM.
+    """
 
-    def __init__(self, state_manager: StateManager, tools: List[types.Tool]):
+    def __init__(self, state_manager: StateManager, tools: List[types.Tool]) -> None:
         self.state_manager = state_manager
         self.tools = tools
         self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-        self.conversation_history = []
+        self.conversation_history: List[types.Content] = []
 
-    def generate_with_gemini(self, user_message: str) -> Dict[str, Any]:
-        """Generates a response from the Gemini LLM.
+    def generate_with_gemini(self, user_message: str) -> types.GenerateContentResponse:
+        """
+        Generates a response from the Gemini LLM.
 
         Args:
             user_message (str): The user's message.
 
         Returns:
-            Dict[str, Any]: A dictionary containing the response text and any tool calls.
+            types.GenerateContentResponse: The response from the Gemini LLM.
         """
         system_prompt = load_system_prompt()
         progress_context = self.state_manager.get_context_summary()
         if progress_context:
             system_prompt += f"\n\n## Current Progress Context:\n{progress_context}"
 
-        self.conversation_history.append(
-            {"role": "user", "parts": [{"text": user_message}]}
+        user_content = types.UserContent(
+            parts=[types.Part.from_text(text=user_message)]
         )
+        self.conversation_history.append(user_content)
 
         generation_config = types.GenerateContentConfig(
             system_instruction=system_prompt, tools=self.tools, temperature=0.7
@@ -56,52 +61,28 @@ class GeminiService:
             contents=self.conversation_history,
             config=generation_config,
         )
-        return self._process_response(response)
 
-    def _process_response(
-        self, response: types.GenerateContentResponse
-    ) -> Dict[str, Any]:
-        """Processes the LLM's response.
+        if response.candidates and response.candidates[0].content:
+            self.conversation_history.append(response.candidates[0].content)
 
-        Args:
-            response (GenerateContentResponse): The response from the Gemini LLM.
+        return response
 
-        Returns:
-            Dict[str, Any]: A dictionary containing the response text and any tool calls.
+    def generate_tool_follow_up(
+        self, tool_context: str
+    ) -> types.GenerateContentResponse:
         """
-        response_text = ""
-        tool_calls = []
-
-        if (
-            response.candidates
-            and response.candidates[0].content
-            and response.candidates[0].content.parts
-        ):
-            for part in response.candidates[0].content.parts:
-                if hasattr(part, "text") and part.text:
-                    response_text += part.text
-                elif hasattr(part, "function_call"):
-                    tool_calls.append(part.function_call)
-
-        if response_text:
-            self.conversation_history.append(
-                {"role": "model", "parts": [{"text": response_text}]}
-            )
-
-        return {"text": response_text, "tool_calls": tool_calls}
-
-    def generate_tool_follow_up(self, tool_context: str) -> Dict[str, Any]:
-        """Generates a follow-up response after a tool has been executed.
+        Generates a follow-up response after a tool has been executed.
 
         Args:
             tool_context (str): The context from the tool's execution.
 
         Returns:
-            Dict[str, Any]: A dictionary containing the response text and any tool calls.
+            types.GenerateContentResponse: The response from the Gemini LLM.
         """
-        self.conversation_history.append(
-            {"role": "user", "parts": [{"text": tool_context}]}
+        tool_content = types.UserContent(
+            parts=[types.Part.from_text(text=tool_context)]
         )
+        self.conversation_history.append(tool_content)
 
         generation_config = types.GenerateContentConfig(
             system_instruction=load_system_prompt(), tools=self.tools, temperature=0.7
@@ -112,4 +93,8 @@ class GeminiService:
             contents=self.conversation_history,
             config=generation_config,
         )
-        return self._process_response(follow_up_response)
+
+        if follow_up_response.candidates and follow_up_response.candidates[0].content:
+            self.conversation_history.append(follow_up_response.candidates[0].content)
+
+        return follow_up_response

@@ -4,7 +4,9 @@ import numpy as np
 
 
 class AudioVisualizer:
-    """Processes audio data to calculate a smoothed amplitude for visualization."""
+    """
+    Processes audio data to calculate a smoothed amplitude for visualization.
+    """
 
     def __init__(self, window_size: int = 1024, smoothing: float = 0.9) -> None:
         self.window_size = window_size

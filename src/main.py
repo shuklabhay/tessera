@@ -17,18 +17,20 @@ load_dotenv()
 
 
 from audio_engine.audio_controller import AudioController
-from managers.llm_manager import LLMManager
+from services.conversation_service import ConversationService
 from managers.state_manager import StateManager
 from ui.main_app import TesseraApp
 
 
 def main() -> None:
-    """Launches the Tessera application."""
+    """
+    Launches the Tessera application.
+    """
     state_manager = StateManager()
     audio_controller = AudioController()
-    llm_manager = LLMManager(audio_controller, state_manager)
+    conversation_manager = ConversationService(audio_controller, state_manager)
 
-    app = TesseraApp(llm_manager=llm_manager)
+    app = TesseraApp(conversation_manager=conversation_manager)
     app.run()
 
 

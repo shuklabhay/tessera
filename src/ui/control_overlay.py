@@ -9,7 +9,9 @@ from kivy.uix.label import Label
 
 
 class ControlOverlay(FloatLayout):
-    """A widget that overlays controls for muting and pausing on top of the main UI."""
+    """
+    A widget that overlays controls for muting and pausing on top of the main UI.
+    """
 
     is_muted = BooleanProperty(False)
     is_paused = BooleanProperty(False)
@@ -42,7 +44,7 @@ class ControlOverlay(FloatLayout):
             color=(1, 1, 1, 1),
             font_size=14,
         )
-        self.control_button.bind(on_press=self._on_control_press)
+        self.control_button.bind(on_press=lambda x: self._on_control_press())
         self.add_widget(self.control_button)
 
         self.pause_button = Button(
@@ -54,7 +56,7 @@ class ControlOverlay(FloatLayout):
             color=(1, 1, 1, 1),
             font_size=20,
         )
-        self.pause_button.bind(on_press=self._on_pause_press)
+        self.pause_button.bind(on_press=lambda x: self._on_pause_press())
         self.add_widget(self.pause_button)
 
         self.status_icon = Label(
@@ -68,32 +70,30 @@ class ControlOverlay(FloatLayout):
         self.add_widget(self.status_icon)
 
     def _update_overlay(self, *args: Any) -> None:
-        """Updates the overlay rectangle's size and position to match the layout."""
+        """
+        Updates the overlay rectangle's size and position to match the layout.
+        """
         self.overlay_rect.pos = self.pos
         self.overlay_rect.size = self.size
 
     def _update_overlay_color(self, *args: Any) -> None:
-        """Updates the overlay color's opacity."""
+        """
+        Updates the overlay color's opacity.
+        """
         self.overlay_color.a = self.overlay_opacity
 
-    def _on_control_press(self, button: Button) -> None:
+    def _on_control_press(self) -> None:
         """
         Handles the press event for the main control button.
-
-        Args:
-            button (Button): The button instance that was pressed.
         """
         if self.is_paused:
             self._unpause()
         else:
             self._toggle_mute()
 
-    def _on_pause_press(self, button: Button) -> None:
+    def _on_pause_press(self) -> None:
         """
         Handles the press event for the pause button.
-
-        Args:
-            button (Button): The button instance that was pressed.
         """
         if self.is_paused:
             self._unpause()
@@ -101,14 +101,18 @@ class ControlOverlay(FloatLayout):
             self._pause()
 
     def _toggle_mute(self) -> None:
-        """Toggles the mute state."""
+        """
+        Toggles the mute state.
+        """
         if self.is_muted:
             self._unmute()
         else:
             self._mute()
 
     def _mute(self) -> None:
-        """Enters the muted state and shows the overlay."""
+        """
+        Enters the muted state and shows the overlay.
+        """
         self.is_muted = True
         self.is_paused = False
         self.control_button.text = "UNMUTE"
@@ -118,7 +122,9 @@ class ControlOverlay(FloatLayout):
             self.on_mute_callback(True)
 
     def _unmute(self) -> None:
-        """Exits the muted state and hides the overlay."""
+        """
+        Exits the muted state and hides the overlay.
+        """
         self.is_muted = False
         self.control_button.text = "MUTE"
         self._hide_overlay()
@@ -126,7 +132,9 @@ class ControlOverlay(FloatLayout):
             self.on_mute_callback(False)
 
     def _pause(self) -> None:
-        """Enters the paused state and shows the overlay."""
+        """
+        Enters the paused state and shows the overlay.
+        """
         self.is_paused = True
         self.is_muted = False
         self.control_button.text = "UNMUTE"
@@ -137,7 +145,9 @@ class ControlOverlay(FloatLayout):
             self.on_pause_callback(True)
 
     def _unpause(self) -> None:
-        """Exits the paused state and hides the overlay."""
+        """
+        Exits the paused state and hides the overlay.
+        """
         self.is_paused = False
         self.control_button.text = "MUTE"
         self.pause_button.text = "||"
@@ -146,7 +156,9 @@ class ControlOverlay(FloatLayout):
             self.on_pause_callback(False)
 
     def _show_overlay(self) -> None:
-        """Shows the dark overlay and status icon with an animation."""
+        """
+        Shows the dark overlay and status icon with an animation.
+        """
         overlay_anim = Animation(
             overlay_opacity=0.6, duration=0.3, transition="out_quad"
         )
@@ -155,7 +167,9 @@ class ControlOverlay(FloatLayout):
         icon_anim.start(self.status_icon)
 
     def _hide_overlay(self) -> None:
-        """Hides the dark overlay and status icon with an animation."""
+        """
+        Hides the dark overlay and status icon with an animation.
+        """
         overlay_anim = Animation(
             overlay_opacity=0.0, duration=0.3, transition="in_quad"
         )
@@ -164,7 +178,9 @@ class ControlOverlay(FloatLayout):
         icon_anim.start(self.status_icon)
 
     def force_reset(self) -> None:
-        """Resets the overlay to its default non-muted and non-paused state."""
+        """
+        Resets the overlay to its default non-muted and non-paused state.
+        """
         self.is_muted = False
         self.is_paused = False
         self.control_button.text = "MUTE"

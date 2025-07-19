@@ -19,7 +19,9 @@ AUDIO_DIRS = {
 
 
 class AudioLoader:
-    """A class to load and process audio files from specified directories."""
+    """
+    A class to load and process audio files from specified directories.
+    """
 
     def __init__(self) -> None:
         self.paths = AUDIO_DIRS

@@ -6,7 +6,9 @@ import pygame
 
 
 class AudioMixer:
-    """A class to manage audio playback using pygame.mixer."""
+    """
+    A class to manage audio playback using pygame.mixer.
+    """
 
     def __init__(self, num_channels: int = 8) -> None:
         if not pygame.mixer.get_init():
@@ -104,7 +106,9 @@ class AudioMixer:
         return False
 
     def stop_all(self) -> None:
-        """Stops playback on all channels."""
+        """
+        Stops playback on all channels.
+        """
         with self.lock:
             for ch in self.channels:
                 ch.stop()
