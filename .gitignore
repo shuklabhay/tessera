@@ -182,3 +182,16 @@ AGENTS.md
 src/prompts/progress.json
 /audio
 /models
+
+# Web assets
+/web/media/videos/*.mp4
+/web/media/videos/*.webm
+/web/media/videos/*.mov
+/web/media/audio/*.mp3
+/web/media/audio/*.ogg
+/web/media/audio/*.wav
+/web/media/images/screenshots/*.jpg
+/web/media/images/screenshots/*.jpeg
+/web/media/images/screenshots/*.png
+/web/media/images/screenshots/*.webp
+/web/.DS_Store

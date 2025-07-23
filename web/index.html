@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tessera - AI Hearing Rehabilitation</title>
+    <link rel="stylesheet" href="css/main.css" />
+    <link rel="stylesheet" href="css/orb-animation.css" />
+    <link rel="stylesheet" href="css/audio-waves.css" />
+  </head>
+  <body>
+    <div class="noise"></div>
+    <header>
+      <div class="container header-wrap">
+        <div class="logo-area">
+          <h1>Tessera</h1>
+        </div>
+        <p>Auditory training that actually works</p>
+      </div>
+    </header>
+
+    <main>
+      <section id="hero" class="section">
+        <div class="container hero-wrap">
+          <div class="hero-content">
+            <h2>Kai: Your Hearing Coach</h2>
+            <p>
+              Voice-guided training using AI to rewire your auditory processing.
+              No fluff, just results.
+            </p>
+          </div>
+          <div class="hero-media">
+            <div class="video-placeholder">
+              <div class="placeholder-text">Tessera - Auditory Training</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="key-features" class="section benefits-section">
+        <div class="container">
+          <div class="section-header">
+            <h2>Key Benefits</h2>
+          </div>
+
+          <div class="benefits-cards">
+            <div class="benefit-card">
+              <div class="benefit-icon">
+                <svg
+                  width="40"
+                  height="40"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  />
+                  <path
+                    d="M12 6V12L16 14"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+              <h3>Personalized Training</h3>
+              <p>
+                Fresh start each session. No history, no bias. Just pure focus
+                on what you need today, adapting to your progress and
+                challenges.
+              </p>
+            </div>
+
+            <div class="benefit-card">
+              <div class="benefit-icon">
+                <svg
+                  width="40"
+                  height="40"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M3 14H7C7.55228 14 8 13.5523 8 13V5C8 4.44772 7.55228 4 7 4H3C2.44772 4 2 4.44772 2 5V13C2 13.5523 2.44772 14 3 14Z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  />
+                  <path
+                    d="M10 20H14C14.5523 20 15 19.5523 15 19V5C15 4.44772 14.5523 4 14 4H10C9.44772 4 9 4.44772 9 5V19C9 19.5523 9.44772 20 10 20Z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  />
+                  <path
+                    d="M17 20H21C21.5523 20 22 19.5523 22 19V11C22 10.4477 21.5523 10 21 10H17C16.4477 10 16 10.4477 16 11V19C16 19.5523 16.4477 20 17 20Z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  />
+                </svg>
+              </div>
+              <h3>Audio-First</h3>
+              <p>
+                Hear → Think → Respond. Builds intuitive listening skills
+                through discovery.
+              </p>
+            </div>
+
+            <div class="benefit-card">
+              <div class="benefit-icon">
+                <svg
+                  width="40"
+                  height="40"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M5 3V19H21"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M10 8L15 13"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                  <path
+                    d="M15 8L20 13"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </div>
+              <h3>Progressive Training</h3>
+              <p>
+                Master each skill before advancing to ensure lasting
+                improvement.
+              </p>
+            </div>
+
+            <div class="benefit-card">
+              <div class="benefit-icon">
+                <svg
+                  width="40"
+                  height="40"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M3 14.8V9.2C3 8.0799 3 7.51984 3.21799 7.09202C3.40973 6.71569 3.71569 6.40973 4.09202 6.21799C4.51984 6 5.0799 6 6.2 6H7.25464C7.37758 6 7.43905 6 7.49576 5.9935C7.79166 5.95961 8.05705 5.79559 8.21969 5.54609C8.25086 5.49827 8.27836 5.44328 8.33333 5.33333C8.44329 5.11342 8.49827 5.00346 8.56062 4.90782C8.8859 4.40882 9.41668 4.08078 10.0085 4.01299C10.1219 4 10.2448 4 10.4907 4H13.5093C13.7552 4 13.8781 4 13.9915 4.01299C14.5833 4.08078 15.1141 4.40882 15.4394 4.90782C15.5017 5.00345 15.5567 5.11345 15.6667 5.33333C15.7216 5.44329 15.7491 5.49827 15.7803 5.54609C15.943 5.79559 16.2083 5.95961 16.5042 5.9935C16.561 6 16.6224 6 16.7454 6H17.8C18.9201 6 19.4802 6 19.908 6.21799C20.2843 6.40973 20.5903 6.71569 20.782 7.09202C21 7.51984 21 8.0799 21 9.2V14.8C21 15.9201 21 16.4802 20.782 16.908C20.5903 17.2843 20.2843 17.5903 19.908 17.782C19.4802 18 18.9201 18 17.8 18H6.2C5.0799 18 4.51984 18 4.09202 17.782C3.71569 17.5903 3.40973 17.2843 3.21799 16.908C3 16.4802 3 15.9201 3 14.8Z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  />
+                  <path
+                    d="M12 15.5C13.6569 15.5 15 14.1569 15 12.5C15 10.8431 13.6569 9.5 12 9.5C10.3431 9.5 9 10.8431 9 12.5C9 14.1569 10.3431 15.5 12 15.5Z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  />
+                </svg>
+              </div>
+              <h3>Immersive Experience</h3>
+              <p>3D audio positioning creates realistic listening scenarios.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="who-benefits" class="section user-profiles-section">
+        <div class="container">
+          <div class="section-header">
+            <h2>Who Can Benefit</h2>
+          </div>
+
+          <div class="user-profile-main">
+            <div class="user-profile-icon">
+              <svg
+                width="60"
+                height="60"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M18.364 5.63604C21.8787 9.15076 21.8787 14.8492 18.364 18.3639C14.8492 21.8787 9.15074 21.8787 5.63604 18.3639C2.12132 14.8492 2.12132 9.15074 5.63604 5.63604C9.15076 2.12132 14.8492 2.12132 18.364 5.63604"
+                  stroke="#FF5722"
+                  stroke-width="2"
+                />
+                <path
+                  d="M13.5 8.5C13.5 9.88071 12.3807 11 11 11C9.61929 11 8.5 9.88071 8.5 8.5C8.5 7.11929 9.61929 6 11 6C12.3807 6 13.5 7.11929 13.5 8.5Z"
+                  stroke="#FF5722"
+                  stroke-width="2"
+                />
+                <path
+                  d="M7.5 18C7.5 16 8.5 13 11 13C13.5 13 14.5 16 14.5 18"
+                  stroke="#FF5722"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M16 10.5C17.1046 10.5 18 9.60457 18 8.5C18 7.39543 17.1046 6.5 16 6.5"
+                  stroke="#FF5722"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M15 13C15 13 16 14 16 15.5"
+                  stroke="#FF5722"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </div>
+            <div class="user-profile-content">
+              <h3>Existing Hearing Aid & Cochlear Implant Users</h3>
+              <p>
+                Maximize the benefits of your hearing technology through
+                targeted auditory training that improves sound recognition and
+                processing.
+              </p>
+            </div>
+          </div>
+
+          <div class="user-profiles-grid">
+            <div class="user-profile-item">
+              <div class="user-profile-icon">
+                <svg
+                  width="44"
+                  height="44"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
+                    stroke="#4A9BFF"
+                    stroke-width="2"
+                  />
+                  <path
+                    d="M16 10.5C17.1046 10.5 18 9.60457 18 8.5C18 7.39543 17.1046 6.5 16 6.5"
+                    stroke="#4A9BFF"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                  />
+                  <path
+                    d="M15 13C15 13 16 14 16 15.5"
+                    stroke="#4A9BFF"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                  />
+                  <path
+                    d="M12 8C10.8954 8 10 7.10457 10 6C10 4.89543 10.8954 4 12 4"
+                    stroke="#4A9BFF"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </div>
+              <div class="user-profile-item-content">
+                <h3>New Hearing Aid Users</h3>
+                <p>
+                  Accelerate adaptation to hearing aids with guided listening
+                  exercises.
+                </p>
+              </div>
+            </div>
+            <div class="user-profile-item">
+              <div class="user-profile-icon">
+                <svg
+                  width="44"
+                  height="44"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="9"
+                    cy="9"
+                    r="2"
+                    stroke="#4A9BFF"
+                    stroke-width="2"
+                  />
+                  <path
+                    d="M13 15C13 16.1046 11.1046 17 9 17C6.89543 17 5 16.1046 5 15"
+                    stroke="#4A9BFF"
+                    stroke-width="2"
+                  />
+                  <circle
+                    cx="15"
+                    cy="6"
+                    r="1"
+                    stroke="#4A9BFF"
+                    stroke-width="2"
+                  />
+                  <path
+                    d="M17 9C17 9.55228 16.1046 10 15 10C13.8954 10 13 9.55228 13 9"
+                    stroke="#4A9BFF"
+                    stroke-width="2"
+                  />
+                  <circle
+                    cx="15"
+                    cy="18"
+                    r="1"
+                    stroke="#4A9BFF"
+                    stroke-width="2"
+                  />
+                  <path
+                    d="M17 21C17 21.5523 16.1046 22 15 22C13.8954 22 13 21.5523 13 21"
+                    stroke="#4A9BFF"
+                    stroke-width="2"
+                  />
+                </svg>
+              </div>
+              <div class="user-profile-item-content">
+                <h3>Hearing Loss at Any Age</h3>
+                <p>
+                  Progressive exercises suitable for various degrees of hearing
+                  loss.
+                </p>
+              </div>
+            </div>
+            <div class="user-profile-item full-width">
+              <div class="user-profile-icon">
+                <svg
+                  width="44"
+                  height="44"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2 18L6.15781 13.1662C6.27827 13.0186 6.47499 12.9702 6.64771 13.0505L10.9554 14.8211C11.1296 14.9019 11.3274 14.852 11.4466 14.7025L17.7321 6.85961C17.8381 6.72808 18.0193 6.67830 18.1832 6.73917L22 8"
+                    stroke="#00CC66"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M22 14C22 14 20.5 15.5 19 17C17.5 18.5 16.5 19.5 16.5 19.5"
+                    stroke="#00CC66"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M4 4H12"
+                    stroke="#00CC66"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                  <path
+                    d="M7 7L15 7"
+                    stroke="#00CC66"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </div>
+              <div class="user-profile-item-content">
+                <h3>Auditory Processing Disorders</h3>
+                <p>
+                  Targeted training that strengthens neural pathways for
+                  improved sound processing.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="training-protocols" class="section demos-section">
+        <div class="container">
+          <div class="section-header">
+            <h2>Training protocols</h2>
+          </div>
+
+          <div class="intro-text">
+            <p>
+              Kai, your responsive AI coach, adapts in real-time to your
+              progress, guiding you through increasingly complex auditory
+              training scenarios.
+            </p>
+          </div>
+
+          <div class="protocols-grid">
+            <div class="module-item">
+              <div class="module-visual terminal-style">
+                <div class="window-controls">
+                  <span></span><span></span><span></span>
+                </div>
+                <pre class="terminal-output">
+🔊 Kai: "Listen carefully. What do you hear?"
+*plays audio*
+You: "I hear water..."
+🔊 Kai: "Be more specific. Is it flowing? Dripping?"
+                </pre>
+              </div>
+              <div class="module-text">
+                <h3>Sound Discovery</h3>
+                <p class="module-description">
+                  Kai guides you through interactive sound identification,
+                  adapting questions based on your responses.
+                </p>
+              </div>
+            </div>
+
+            <div class="module-item">
+              <div class="module-visual">
+                <div class="video-placeholder rough-border">
+                  <div class="orb-container">
+                    <svg
+                      class="figure8-svg"
+                      viewBox="0 0 300 150"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        class="figure8-path"
+                        d="M 50,75 C 50,25 150,125 250,75 C 250,25 150,125 50,75"
+                        stroke="rgba(255, 255, 255, 0.3)"
+                        stroke-width="2"
+                        fill="transparent"
+                        stroke-dasharray="5,5"
+                      />
+                      <circle
+                        class="orb-1"
+                        cx="50"
+                        cy="75"
+                        r="6"
+                        fill="white"
+                      />
+                      <circle
+                        class="orb-2"
+                        cx="250"
+                        cy="75"
+                        r="6"
+                        fill="white"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <div class="module-text">
+                <h3>Spatial Training</h3>
+                <p class="module-description">
+                  Practice tracking sounds moving through 3D space to improve
+                  directional hearing.
+                </p>
+              </div>
+            </div>
+
+            <div class="module-item">
+              <div class="module-visual">
+                <div class="video-placeholder rough-border">
+                  <div class="audio-waves-container">
+                    <div class="audio-waves">
+                      <div class="wave wave-primary">
+                        <div class="wave-line"></div>
+                        <div class="wave-points"></div>
+                        <div class="focus-indicator"></div>
+                      </div>
+                      <div class="wave wave-secondary">
+                        <div class="wave-line"></div>
+                        <div class="wave-points"></div>
+                      </div>
+                      <div class="wave wave-background">
+                        <div class="wave-line"></div>
+                        <div class="wave-points"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="module-text">
+                <h3>Multi-Stream Focus</h3>
+                <p class="module-description">
+                  Learn to focus on specific speakers while filtering out
+                  background conversations.
+                </p>
+              </div>
+            </div>
+
+            <div class="module-item">
+              <div class="module-visual">
+                <div class="video-placeholder rough-border">
+                  <div class="progress-visual">
+                    <div class="progress-chart">
+                      <div class="progress-bar" style="width: 75%"></div>
+                      <div class="progress-marker" style="left: 25%"></div>
+                      <div class="progress-marker" style="left: 50%"></div>
+                      <div class="progress-marker" style="left: 75%"></div>
+                    </div>
+                    <div class="progress-stats">
+                      <div class="stat-item">
+                        <span class="stat-value">75%</span>
+                        <span class="stat-label">Completion</span>
+                      </div>
+                      <div class="stat-item">
+                        <span class="stat-value">42</span>
+                        <span class="stat-label">Sounds Mastered</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="module-text">
+                <h3>Progress Tracking</h3>
+                <p class="module-description">
+                  Track your improvement over time with adaptive difficulty that
+                  matches your skill development.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="real-world-benefits" class="section benefits-section">
+        <div class="container">
+          <div class="section-header">
+            <h2>Real-World Benefits</h2>
+          </div>
+          <div class="features-wrapper">
+            <div class="feature feature-small">
+              <h3>Better Conversation Skills</h3>
+              <p>
+                Improved ability to follow discussions in noisy environments
+                like restaurants and parties.
+              </p>
+            </div>
+            <div class="feature feature-small">
+              <h3>Increased Safety</h3>
+              <p>
+                Better recognition of important warning signals and alarms in
+                everyday environments.
+              </p>
+            </div>
+            <div class="feature feature-small">
+              <h3>Reduced Listening Fatigue</h3>
+              <p>
+                More efficient auditory processing means less mental effort
+                spent on understanding sounds.
+              </p>
+            </div>
+            <div class="feature feature-small">
+              <h3>Enhanced Music Appreciation</h3>
+              <p>Rediscover the nuances and details in your favorite music.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="try-it" class="section no-border">
+        <div class="container">
+          <div class="download-options">
+            <div class="button disabled">
+              Coming Soon <span class="icon">↓</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="container">
+        <div class="footer-content">
+          <div class="footer-left">
+            <p class="copyright">&copy; 2025</p>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <script src="js/animations.js"></script>
+    <script src="js/audio-waves.js"></script>
+    <script src="js/figure8-animation.js"></script>
+    <script src="js/main.js"></script>
+  </body>
+</html>

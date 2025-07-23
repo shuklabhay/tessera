@@ -1,0 +1,101 @@
+.audio-waves-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0.8);
+    border-radius: 3px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.audio-waves {
+    position: relative;
+    width: 100%;
+    height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+}
+
+.wave {
+    position: relative;
+    height: 30px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.wave-primary {
+    opacity: 1;
+}
+
+.wave-secondary {
+    opacity: 0.5;
+}
+
+.wave-background {
+    opacity: 0.25;
+}
+
+.wave-line {
+    position: absolute;
+    top: 50%;
+    width: 100%;
+    height: 2px;
+    background-color: transparent;
+}
+
+.wave-primary .wave-line {
+    background-color: var(--primary-color);
+    box-shadow: 0 0 8px 2px rgba(74, 155, 255, 0.6);
+}
+
+.wave-secondary .wave-line {
+    background-color: var(--accent-color);
+}
+
+.wave-background .wave-line {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+.wave-points {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.wave-point {
+    position: absolute;
+    height: 2px;
+    width: 2px;
+    background-color: currentColor;
+    border-radius: 50%;
+}
+
+.wave-primary .wave-point {
+    color: var(--primary-color);
+}
+
+.wave-secondary .wave-point {
+    color: var(--accent-color);
+}
+
+.wave-background .wave-point {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.focus-indicator {
+    position: absolute;
+    left: 10px;
+    width: 5px;
+    height: 30px;
+    background-color: var(--primary-color);
+    border-radius: 2px;
+    box-shadow: 0 0 8px 2px rgba(74, 155, 255, 0.4);
+}
