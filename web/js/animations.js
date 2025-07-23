@@ -130,8 +130,8 @@ class ScrollAnimations {
 
   animateCounter(element, target) {
     let current = 0;
-    const increment = target / 40; 
-    const duration = 1000; 
+    const increment = target / 40;
+    const duration = 1000;
     const stepTime = duration / 40;
 
     const timer = setInterval(() => {
@@ -147,55 +147,7 @@ class ScrollAnimations {
 
 class ParallaxEffect {
   constructor() {
-    this.elements = [];
-    this.init();
-  }
-
-  init() {
-    const heroVideo = document.querySelector(".hero-video");
-    const heroContent = document.querySelector(".hero-content");
-
-    if (heroVideo) {
-      this.elements.push({
-        element: heroVideo,
-        speed: 0.5,
-      });
-    }
-
-    if (heroContent) {
-      this.elements.push({
-        element: heroContent,
-        speed: 0.8,
-      });
-    }
-
-    if (this.elements.length > 0) {
-      this.bindEvents();
-    }
-  }
-
-  bindEvents() {
-    let ticking = false;
-
-    window.addEventListener("scroll", () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          this.updateParallax();
-          ticking = false;
-        });
-        ticking = true;
-      }
-    });
-  }
-
-  updateParallax() {
-    const scrolled = window.pageYOffset;
-    const rate = scrolled * -0.5;
-
-    this.elements.forEach((item) => {
-      const yPos = Math.round(rate * item.speed);
-      item.element.style.transform = `translateY(${yPos}px)`;
-    });
+    // Parallax effect disabled
   }
 }
 
@@ -253,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (!prefersReducedMotion) {
     new ScrollAnimations();
-    new ParallaxEffect();
+    // Parallax effect removed
     new TextRevealAnimation();
     initializeFigure8Animation();
   }
