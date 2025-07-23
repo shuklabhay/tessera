@@ -72,7 +72,13 @@ class AudioController:
 
     def _get_audio_description(self, filepath: str) -> str:
         """
-        Get description from companion text file.
+        Retrieves audio description from companion text file.
+
+        Args:
+            filepath: Path to the audio file.
+
+        Returns:
+            str: Description of the audio file or default message.
         """
         if not filepath:
             return "No description available."

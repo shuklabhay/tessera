@@ -9,10 +9,10 @@ from managers.state_manager import StateManager
 
 def load_system_prompt() -> str:
     """
-    Loads the system prompt from a file.
+    Loads the system prompt from the prompts directory.
 
     Returns:
-        str: The system prompt.
+        str: The system prompt content.
     """
     prompt_path = os.path.join(
         os.path.dirname(__file__), "..", "prompts", "system_prompt.md"
