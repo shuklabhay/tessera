@@ -13,7 +13,7 @@ from services.gemini_service import GeminiService
 from services.recording_service import RecordingService
 from services.transcription_service import TranscriptionService
 from services.tts_service import TextToSpeechService
-from tool_registry import ToolRegistry
+from managers.tool_register import ToolRegister
 
 ssl._create_default_https_context = ssl._create_unverified_context
 os.environ["SSL_CERT_FILE"] = certifi.where()
@@ -31,7 +31,7 @@ class ConversationService:
     ) -> None:
         self.audio_controller = audio_controller
         self.state_manager = state_manager
-        self.tool_registry = ToolRegistry(audio_controller, state_manager)
+        self.tool_registry = ToolRegister(audio_controller, state_manager)
 
         self.recording_service = RecordingService()
         self.transcription_service = TranscriptionService()

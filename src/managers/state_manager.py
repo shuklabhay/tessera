@@ -20,14 +20,14 @@ class StateManager:
             Dict[str, Any]: The application state.
         """
         if not self.progress_file.exists():
-            default_state = {"sessions": []}
+            default_state = {"sessions": [], "disclaimer_acknowledged": False}
             self._write_state(default_state)
             return default_state
 
         content = self.progress_file.read_text(encoding="utf-8").strip()
 
         if not content:
-            default_state = {"sessions": []}
+            default_state = {"sessions": [], "disclaimer_acknowledged": False}
             self._write_state(default_state)
             return default_state
 
@@ -104,3 +104,18 @@ class StateManager:
         state[field] = value
         self._write_state(state)
         return f"{field} updated"
+
+    def is_disclaimer_acknowledged(self) -> bool:
+        """Checks if the disclaimer has been acknowledged.
+
+        Returns:
+            bool: True if disclaimer has been acknowledged, otherwise False.
+        """
+        state = self._read_state()
+        return state.get("disclaimer_acknowledged", False)
+
+    def acknowledge_disclaimer(self) -> None:
+        """Records that the disclaimer has been acknowledged."""
+        state = self._read_state()
+        state["disclaimer_acknowledged"] = True
+        self._write_state(state)

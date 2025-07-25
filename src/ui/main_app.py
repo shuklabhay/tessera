@@ -10,10 +10,12 @@ from kivy.uix.floatlayout import FloatLayout
 from ui.audio_visualizer import AudioVisualizer
 from ui.control_overlay import ControlOverlay
 from ui.orb import Orb
+from ui.splash_screen import SplashScreen
+from managers.state_manager import StateManager
 
 Window.minimum_width, Window.minimum_height = 202, 300
-Window.size = (405, 600)
-Window.resizable = True
+Window.size = (405, 550)
+Window.resizable = False
 
 
 class MainLayout(FloatLayout):
@@ -23,11 +25,19 @@ class MainLayout(FloatLayout):
 
     def __init__(self, conversation_manager: Optional[Any] = None, **kwargs) -> None:
         super(MainLayout, self).__init__(**kwargs)
+        self.conversation_manager = conversation_manager
+        self.state_manager = StateManager()
+        
         with self.canvas.before:
             Color(0, 0, 0, 1)
             self.bg = Rectangle(pos=self.pos, size=self.size)
 
         self.bind(size=self._update_bg, pos=self._update_bg)
+
+        self._setup_main_interface()
+
+    def _setup_main_interface(self) -> None:
+        """Sets up the main application interface components."""
 
         self.orb = Orb(
             size_hint=(None, None), pos_hint={"center_x": 0.5, "center_y": 0.5}
@@ -35,7 +45,6 @@ class MainLayout(FloatLayout):
         self.orb.base_radius = min(Window.width, Window.height) / 6
         self.add_widget(self.orb)
 
-        self.conversation_manager = conversation_manager
         self.audio_visualizer = AudioVisualizer()
         Clock.schedule_interval(lambda dt: self.update_orb_from_audio(), 1 / 30)
 
@@ -46,8 +55,22 @@ class MainLayout(FloatLayout):
         )
         self.add_widget(self.control_overlay)
 
+        self.splash_screen = SplashScreen(
+            on_acknowledge=self._on_disclaimer_acknowledged,
+            size_hint=(1, 1),
+            pos_hint={"center_x": 0.5, "center_y": 0.5},
+        )
+        self.add_widget(self.splash_screen)
+
+        self.splash_screen.show_splash()
+
+        # Don't start conversation automatically - wait for disclaimer acknowledgment
+
+    def _on_disclaimer_acknowledged(self) -> None:
+        """Handles disclaimer acknowledgment by hiding the splash screen and starting conversation."""
+        self.state_manager.acknowledge_disclaimer()
         if self.conversation_manager:
-            Clock.schedule_once(lambda dt: self.start_conversation(), 1)
+            Clock.schedule_once(lambda dt: self.start_conversation(), 0.5)
 
     def _update_bg(self, instance: Any, value: Any) -> None:
         """

@@ -6,7 +6,7 @@ from audio_engine.audio_controller import AudioController
 from managers.state_manager import StateManager
 
 
-class ToolRegistry:
+class ToolRegister:
     """
     Manages tool definitions and execution for the LLM.
     """
@@ -256,30 +256,30 @@ class ToolRegistry:
             The result of the function call.
         """
         function_name = function_call.name
-        args = function_call.args if hasattr(function_call, "args") else {}
+        args = function_call.args if hasattr(function_call, "args") and function_call.args else {}
 
         if function_name == "play_environmental_sound":
-            volume = args.get("volume", 0.7)
+            volume = args.get("volume", 0.7) if args else 0.7
             return self.audio_controller.play_environmental_sound(volume)
         elif function_name == "play_speaker_sound":
-            volume = args.get("volume", 0.7)
+            volume = args.get("volume", 0.7) if args else 0.7
             return self.audio_controller.play_speaker_sound(volume)
         elif function_name == "play_noise_sound":
-            volume = args.get("volume", 0.7)
+            volume = args.get("volume", 0.7) if args else 0.7
             return self.audio_controller.play_noise_sound(volume)
         elif function_name == "adjust_volume":
             return self.audio_controller.adjust_volume(
-                args.get("volume", 0.7), args.get("clip_id")
+                args.get("volume", 0.7) if args else 0.7, args.get("clip_id") if args else None
             )
         elif function_name == "stop_audio":
-            return self.audio_controller.stop_audio(args.get("audio_type"))
+            return self.audio_controller.stop_audio(args.get("audio_type") if args else None)
         elif function_name == "stop_all_audio":
             return self.audio_controller.stop_all_audio()
         elif function_name == "get_status":
             status = self.audio_controller.get_status()
             return status if isinstance(status, (str, dict)) else str(status)
         elif function_name == "add_session_observation":
-            summary = args.get("summary")
+            summary = args.get("summary") if args else None
             if summary:
                 return self._update_progress_file(summary)
             return "Error: summary not provided."
@@ -289,28 +289,31 @@ class ToolRegistry:
             return self.state_manager.get_full_progress()
         elif function_name == "pan_pattern_sweep":
             return self.audio_controller.pan_pattern_sweep(
-                args.get("clip_id", 0),
-                args.get("direction", "left_to_right"),
-                args.get("speed", "moderate"),
+                args.get("clip_id", 0) if args else 0,
+                args.get("direction", "left_to_right") if args else "left_to_right",
+                args.get("speed", "moderate") if args else "moderate",
             )
         elif function_name == "pan_pattern_pendulum":
             return self.audio_controller.pan_pattern_pendulum(
-                args.get("clip_id", 0),
-                args.get("cycles", 3),
-                args.get("duration_per_cycle", 2.0),
+                args.get("clip_id", 0) if args else 0,
+                args.get("cycles", 3) if args else 3,
+                args.get("duration_per_cycle", 2.0) if args else 2.0,
             )
         elif function_name == "pan_pattern_alternating":
             return self.audio_controller.pan_pattern_alternating(
-                args.get("clip_id", 0), args.get("interval", 1.0), args.get("cycles", 4)
+                args.get("clip_id", 0) if args else 0, 
+                args.get("interval", 1.0) if args else 1.0, 
+                args.get("cycles", 4) if args else 4
             )
         elif function_name == "pan_to_side":
             return self.audio_controller.pan_to_side(
-                args.get("clip_id", 0), args.get("side", "center")
+                args.get("clip_id", 0) if args else 0, 
+                args.get("side", "center") if args else "center"
             )
         elif function_name == "stop_panning_patterns":
-            return self.audio_controller.stop_panning_patterns(args.get("clip_id"))
+            return self.audio_controller.stop_panning_patterns(args.get("clip_id") if args else None)
         elif function_name == "play_alert_sound":
-            volume = args.get("volume", 0.7)
+            volume = args.get("volume", 0.7) if args else 0.7
             return self.audio_controller.play_alert_sound(volume)
         else:
             return f"Unknown function: {function_name}"
