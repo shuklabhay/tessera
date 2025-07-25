@@ -1,0 +1,36 @@
+name: Python Lint Check
+
+on: [push]
+
+jobs:
+  black-lint:
+    name: Check formatting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12.3"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          uv pip install --system black
+
+      - name: Run Black formatter
+        run: |
+          black --check .
+
+      - name: Fail if code not formatted correctly
+        if: ${{ failure() }}
+        run: |
+          echo "Code is not formatted correctly. Please format with Black."
+          exit 1
