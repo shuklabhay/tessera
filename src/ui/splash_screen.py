@@ -122,9 +122,7 @@ class SplashScreen(FloatLayout):
         """
         Hides the splash screen with an animation.
         """
-        splash_anim = Animation(
-            splash_opacity=0.0, duration=0.5, transition="in_quad"
-        )
+        splash_anim = Animation(splash_opacity=0.0, duration=0.5, transition="in_quad")
         splash_anim.start(self)
 
     def show_splash(self) -> None:
@@ -133,9 +131,7 @@ class SplashScreen(FloatLayout):
         """
         self.splash_opacity = 1.0
         self.disabled = False
-        splash_anim = Animation(
-            splash_opacity=1.0, duration=0.3, transition="out_quad"
-        )
+        splash_anim = Animation(splash_opacity=1.0, duration=0.3, transition="out_quad")
         splash_anim.start(self)
 
 
@@ -147,6 +143,7 @@ if __name__ == "__main__":
 
         def build(self) -> SplashScreen:
             """Builds and returns the splash screen for testing."""
+
             def dummy_acknowledge():
                 print("Disclaimer acknowledged!")
                 self.stop()

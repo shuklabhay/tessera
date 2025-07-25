@@ -27,7 +27,7 @@ class MainLayout(FloatLayout):
         super(MainLayout, self).__init__(**kwargs)
         self.conversation_manager = conversation_manager
         self.state_manager = StateManager()
-        
+
         with self.canvas.before:
             Color(0, 0, 0, 1)
             self.bg = Rectangle(pos=self.pos, size=self.size)

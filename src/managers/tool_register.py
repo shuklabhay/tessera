@@ -11,7 +11,9 @@ class ToolRegister:
     Manages tool definitions and execution for the LLM.
     """
 
-    def __init__(self, audio_controller: AudioController, state_manager: StateManager) -> None:
+    def __init__(
+        self, audio_controller: AudioController, state_manager: StateManager
+    ) -> None:
         self.audio_controller = audio_controller
         self.state_manager = state_manager
 
@@ -246,7 +248,9 @@ class ToolRegister:
             )
         ]
 
-    def execute_function(self, function_call: types.FunctionCall) -> Union[str, Dict[str, Union[str, int]]]:
+    def execute_function(
+        self, function_call: types.FunctionCall
+    ) -> Union[str, Dict[str, Union[str, int]]]:
         """Executes a function call from the model.
 
         Args:
@@ -256,7 +260,11 @@ class ToolRegister:
             The result of the function call.
         """
         function_name = function_call.name
-        args = function_call.args if hasattr(function_call, "args") and function_call.args else {}
+        args = (
+            function_call.args
+            if hasattr(function_call, "args") and function_call.args
+            else {}
+        )
 
         if function_name == "play_environmental_sound":
             volume = args.get("volume", 0.7) if args else 0.7
@@ -269,10 +277,13 @@ class ToolRegister:
             return self.audio_controller.play_noise_sound(volume)
         elif function_name == "adjust_volume":
             return self.audio_controller.adjust_volume(
-                args.get("volume", 0.7) if args else 0.7, args.get("clip_id") if args else None
+                args.get("volume", 0.7) if args else 0.7,
+                args.get("clip_id") if args else None,
             )
         elif function_name == "stop_audio":
-            return self.audio_controller.stop_audio(args.get("audio_type") if args else None)
+            return self.audio_controller.stop_audio(
+                args.get("audio_type") if args else None
+            )
         elif function_name == "stop_all_audio":
             return self.audio_controller.stop_all_audio()
         elif function_name == "get_status":
@@ -301,17 +312,19 @@ class ToolRegister:
             )
         elif function_name == "pan_pattern_alternating":
             return self.audio_controller.pan_pattern_alternating(
-                args.get("clip_id", 0) if args else 0, 
-                args.get("interval", 1.0) if args else 1.0, 
-                args.get("cycles", 4) if args else 4
+                args.get("clip_id", 0) if args else 0,
+                args.get("interval", 1.0) if args else 1.0,
+                args.get("cycles", 4) if args else 4,
             )
         elif function_name == "pan_to_side":
             return self.audio_controller.pan_to_side(
-                args.get("clip_id", 0) if args else 0, 
-                args.get("side", "center") if args else "center"
+                args.get("clip_id", 0) if args else 0,
+                args.get("side", "center") if args else "center",
             )
         elif function_name == "stop_panning_patterns":
-            return self.audio_controller.stop_panning_patterns(args.get("clip_id") if args else None)
+            return self.audio_controller.stop_panning_patterns(
+                args.get("clip_id") if args else None
+            )
         elif function_name == "play_alert_sound":
             volume = args.get("volume", 0.7) if args else 0.7
             return self.audio_controller.play_alert_sound(volume)
