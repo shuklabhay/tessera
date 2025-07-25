@@ -1,4 +1,4 @@
-name: Python Lint Check
+name: Lint
 
 on: [push]
 
