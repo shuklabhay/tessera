@@ -25,7 +25,7 @@ Conversational voice agent for auditory rehabilitation through adaptive listenin
 
 ### API Key Setup
 
-- Get a Google Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+- Get a Google Gemini API key from [Google AI Studio](https://aistudio.google.com/u/1/apikey)
 - Create a `.env` file in the project root directory
 - Add your API key to the `.env` file:
   ```
