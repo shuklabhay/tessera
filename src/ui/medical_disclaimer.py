@@ -9,7 +9,7 @@ from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.label import Label
 
 
-class SplashScreen(FloatLayout):
+class MedicalDisclaimer(FloatLayout):
     """
     Displays a medical device disclaimer overlay that must be acknowledged before proceeding.
     """
@@ -17,7 +17,7 @@ class SplashScreen(FloatLayout):
     splash_opacity = NumericProperty(1.0)
 
     def __init__(self, on_acknowledge: Callable[[], None], **kwargs) -> None:
-        super(SplashScreen, self).__init__(**kwargs)
+        super(MedicalDisclaimer, self).__init__(**kwargs)
         self.on_acknowledge = on_acknowledge
 
         with self.canvas.before:
@@ -141,13 +141,13 @@ if __name__ == "__main__":
     class SplashTestApp(App):
         """Test app for the splash screen."""
 
-        def build(self) -> SplashScreen:
+        def build(self) -> MedicalDisclaimer:
             """Builds and returns the splash screen for testing."""
 
             def dummy_acknowledge():
                 print("Disclaimer acknowledged!")
                 self.stop()
 
-            return SplashScreen(on_acknowledge=dummy_acknowledge)
+            return MedicalDisclaimer(on_acknowledge=dummy_acknowledge)
 
     SplashTestApp().run()

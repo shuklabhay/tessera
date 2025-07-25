@@ -7,11 +7,11 @@ from kivy.core.window import Window
 from kivy.graphics import Color, Rectangle
 from kivy.uix.floatlayout import FloatLayout
 
+from managers.state_manager import StateManager
 from ui.audio_visualizer import AudioVisualizer
 from ui.control_overlay import ControlOverlay
+from ui.medical_disclaimer import MedicalDisclaimer
 from ui.orb import Orb
-from ui.splash_screen import SplashScreen
-from managers.state_manager import StateManager
 
 Window.minimum_width, Window.minimum_height = 202, 300
 Window.size = (405, 550)
@@ -55,7 +55,7 @@ class MainLayout(FloatLayout):
         )
         self.add_widget(self.control_overlay)
 
-        self.splash_screen = SplashScreen(
+        self.splash_screen = MedicalDisclaimer(
             on_acknowledge=self._on_disclaimer_acknowledged,
             size_hint=(1, 1),
             pos_hint={"center_x": 0.5, "center_y": 0.5},
