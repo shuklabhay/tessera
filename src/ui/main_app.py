@@ -10,8 +10,8 @@ from kivy.uix.floatlayout import FloatLayout
 from managers.state_manager import StateManager
 from ui.audio_visualizer import AudioVisualizer
 from ui.control_overlay import ControlOverlay
-from ui.medical_disclaimer import MedicalDisclaimer
 from ui.orb import Orb
+from ui.startup_routine import StartupRoutine
 
 Window.minimum_width, Window.minimum_height = 202, 300
 Window.size = (405, 550)
@@ -35,6 +35,7 @@ class MainLayout(FloatLayout):
         self.bind(size=self._update_bg, pos=self._update_bg)
 
         self._setup_main_interface()
+        self._show_startup_routine()
 
     def _setup_main_interface(self) -> None:
         """Sets up the main application interface components."""
@@ -55,22 +56,29 @@ class MainLayout(FloatLayout):
         )
         self.add_widget(self.control_overlay)
 
-        self.splash_screen = MedicalDisclaimer(
-            on_acknowledge=self._on_disclaimer_acknowledged,
+    def _show_startup_routine(self) -> None:
+        """Shows the startup routine overlay."""
+        self.startup_routine = StartupRoutine(
+            on_complete=self._on_startup_complete,
             size_hint=(1, 1),
             pos_hint={"center_x": 0.5, "center_y": 0.5},
         )
-        self.add_widget(self.splash_screen)
+        self.add_widget(self.startup_routine)
+        self.startup_routine.show_startup()
 
-        self.splash_screen.show_splash()
-
-        # Don't start conversation automatically - wait for disclaimer acknowledgment
-
-    def _on_disclaimer_acknowledged(self) -> None:
-        """Handles disclaimer acknowledgment by hiding the splash screen and starting conversation."""
-        self.state_manager.acknowledge_disclaimer()
-        if self.conversation_manager:
-            Clock.schedule_once(lambda dt: self.start_conversation(), 0.5)
+    def _on_startup_complete(self) -> None:
+        """Handles startup routine completion by initializing conversation manager."""
+        if hasattr(self, 'startup_routine'):
+            self.remove_widget(self.startup_routine)
+        
+        if not self.conversation_manager:
+            from audio_engine.audio_controller import AudioController
+            from services.conversation_service import ConversationService
+            
+            audio_controller = AudioController()
+            self.conversation_manager = ConversationService(audio_controller, self.state_manager)
+        
+        Clock.schedule_once(lambda dt: self.start_conversation(), 0.5)
 
     def _update_bg(self, instance: Any, value: Any) -> None:
         """
@@ -135,12 +143,7 @@ class TesseraApp(App):
         """
         return MainLayout(conversation_manager=self.conversation_manager)
 
-    def on_stop(self) -> bool:
-        """Cleans up resources when the application is closed.
-
-        Returns:
-            bool: A boolean to indicate if the stopping process should continue.
-        """
+    def on_stop(self) -> None:
+        """Cleans up resources when the application is closed."""
         if self.conversation_manager:
             self.conversation_manager.stop()
-        return True

@@ -6,6 +6,11 @@ import sys
 import certifi
 from dotenv import load_dotenv
 
+from audio_engine.audio_controller import AudioController
+from managers.state_manager import StateManager
+from services.conversation_service import ConversationService
+from ui.main_app import TesseraApp
+
 os.environ["KIVY_LOG_LEVEL"] = "warning"
 logging.getLogger().setLevel(logging.WARNING)
 logging.getLogger("websockets").setLevel(logging.WARNING)
@@ -21,19 +26,19 @@ if current_dir not in sys.path:
 
 load_dotenv()
 
-from audio_engine.audio_controller import AudioController
-from managers.state_manager import StateManager
-from services.conversation_service import ConversationService
-from ui.main_app import TesseraApp
-
 
 def main() -> None:
     """
     Launches the Tessera application.
     """
-    state_manager = StateManager()
-    audio_controller = AudioController()
-    conversation_manager = ConversationService(audio_controller, state_manager)
+    api_key = os.environ.get("GEMINI_API_KEY")
+    conversation_manager = None
+
+    if api_key and api_key.strip().startswith("AIza"):
+
+        state_manager = StateManager()
+        audio_controller = AudioController()
+        conversation_manager = ConversationService(audio_controller, state_manager)
 
     app = TesseraApp(conversation_manager=conversation_manager)
     app.run()
