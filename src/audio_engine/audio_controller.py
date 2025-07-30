@@ -352,10 +352,10 @@ class AudioController:
         if clip_id is None:
             return "clip_id required."
 
-        try:
-            cid_int = int(clip_id)
-        except (ValueError, TypeError):
+        if not isinstance(clip_id, (str, int)) or not str(clip_id).isdigit():
             return f"Invalid clip_id {clip_id}."
+
+        cid_int = int(clip_id)
 
         clip = self.clips.get(cid_int)
         if not clip:
@@ -377,10 +377,10 @@ class AudioController:
         if clip_id is None:
             return "clip_id required."
 
-        try:
-            cid_int = int(clip_id)
-        except (ValueError, TypeError):
+        if not isinstance(clip_id, (str, int)) or not str(clip_id).isdigit():
             return f"Invalid clip_id {clip_id}."
+
+        cid_int = int(clip_id)
 
         clip = self.clips.get(cid_int)
         if not clip:
@@ -546,10 +546,10 @@ class AudioController:
         """
         Sweep audio across the stereo field.
         """
-        try:
-            cid_int = int(clip_id)
-        except (ValueError, TypeError):
+        if not isinstance(clip_id, (str, int)) or not str(clip_id).isdigit():
             return f"Invalid clip_id {clip_id}."
+
+        cid_int = int(clip_id)
 
         if cid_int not in self.clips:
             return f"Unknown clip_id {clip_id}."
@@ -593,10 +593,10 @@ class AudioController:
         """
         Create a pendulum panning motion.
         """
-        try:
-            cid_int = int(clip_id)
-        except (ValueError, TypeError):
+        if not isinstance(clip_id, (str, int)) or not str(clip_id).isdigit():
             return f"Invalid clip_id {clip_id}."
+
+        cid_int = int(clip_id)
 
         if cid_int not in self.clips:
             return f"Unknown clip_id {clip_id}."
@@ -696,10 +696,10 @@ class AudioController:
         """
         Alternate audio between left and right.
         """
-        try:
-            cid_int = int(clip_id)
-        except (ValueError, TypeError):
+        if not isinstance(clip_id, (str, int)) or not str(clip_id).isdigit():
             return f"Invalid clip_id {clip_id}."
+
+        cid_int = int(clip_id)
 
         if cid_int not in self.clips:
             return f"Unknown clip_id {clip_id}."
@@ -757,10 +757,10 @@ class AudioController:
         """
         Smoothly pan audio to a side.
         """
-        try:
-            cid_int = int(clip_id)
-        except (ValueError, TypeError):
+        if not isinstance(clip_id, (str, int)) or not str(clip_id).isdigit():
             return f"Invalid clip_id {clip_id}."
+
+        cid_int = int(clip_id)
 
         if cid_int not in self.clips:
             return f"Unknown clip_id {clip_id}."
@@ -797,12 +797,12 @@ class AudioController:
         Stop panning patterns for a clip or all clips.
         """
         if clip_id is not None:
-            try:
-                cid_int = int(clip_id)
-                self._stop_panning_thread(cid_int)
-                return f"Stopped panning pattern for clip {cid_int}"
-            except (ValueError, TypeError):
+            if not isinstance(clip_id, (str, int)) or not str(clip_id).isdigit():
                 return f"Invalid clip_id {clip_id}"
+
+            cid_int = int(clip_id)
+            self._stop_panning_thread(cid_int)
+            return f"Stopped panning pattern for clip {cid_int}"
         else:
 
             for cid in list(self._panning_threads.keys()):

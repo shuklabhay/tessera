@@ -49,7 +49,7 @@
 
 .wave-primary .wave-line {
     background-color: var(--primary-color);
-    box-shadow: 0 0 8px 2px rgba(74, 155, 255, 0.6);
+    box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.6);
 }
 
 .wave-secondary .wave-line {
@@ -97,5 +97,5 @@
     height: 30px;
     background-color: var(--primary-color);
     border-radius: 2px;
-    box-shadow: 0 0 8px 2px rgba(74, 155, 255, 0.4);
+    box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.4);
 }

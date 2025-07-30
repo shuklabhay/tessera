@@ -68,16 +68,18 @@ class MainLayout(FloatLayout):
 
     def _on_startup_complete(self) -> None:
         """Handles startup routine completion by initializing conversation manager."""
-        if hasattr(self, 'startup_routine'):
+        if hasattr(self, "startup_routine"):
             self.remove_widget(self.startup_routine)
-        
+
         if not self.conversation_manager:
             from audio_engine.audio_controller import AudioController
             from services.conversation_service import ConversationService
-            
+
             audio_controller = AudioController()
-            self.conversation_manager = ConversationService(audio_controller, self.state_manager)
-        
+            self.conversation_manager = ConversationService(
+                audio_controller, self.state_manager
+            )
+
         Clock.schedule_once(lambda dt: self.start_conversation(), 0.5)
 
     def _update_bg(self, instance: Any, value: Any) -> None:

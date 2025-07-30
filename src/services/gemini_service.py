@@ -1,10 +1,10 @@
 import os
-from typing import Dict, List
+from typing import List
 
 import google.genai as genai
 from google.genai import types
 
-from managers.state_manager import StateManager
+from managers.state_manager import StateManager, get_resource_path
 
 
 def load_system_prompt() -> str:
@@ -14,9 +14,7 @@ def load_system_prompt() -> str:
     Returns:
         str: The system prompt content.
     """
-    prompt_path = os.path.join(
-        os.path.dirname(__file__), "..", "prompts", "system_prompt.md"
-    )
+    prompt_path = get_resource_path("src/prompts/system_prompt.md")
     with open(prompt_path, "r") as file:
         return file.read()
 

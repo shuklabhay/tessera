@@ -5,7 +5,7 @@
 
 ## App Info
 
-Conversational voice agent for auditory rehabilitation through adaptive listening exercises. Access application [here.](https://shuklabhay.github.io/tessera/)
+Conversational voice agent for auditory rehabilitation through adaptive listening exercises. View more information [here.](https://shuklabhay.github.io/tessera/)
 
 ## Features
 

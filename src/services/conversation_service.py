@@ -4,21 +4,17 @@ import threading
 from typing import Dict, List, Union
 
 import certifi
-from dotenv import load_dotenv
 from google.genai import types
 
 from audio_engine.audio_controller import AudioController
-from managers.state_manager import StateManager
-from services.gemini_service import GeminiService
-from services.recording_service import RecordingService
-from services.transcription_service import TranscriptionService
-from services.tts_service import TextToSpeechService
+from managers.state_manager import StateManager, get_resource_path
 from managers.tool_register import ToolRegister
+from services.gemini_service import GeminiService
+from services.audio_service import AudioService
 
 ssl._create_default_https_context = ssl._create_unverified_context
 os.environ["SSL_CERT_FILE"] = certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
-load_dotenv()
 
 
 class ConversationService:
@@ -33,11 +29,9 @@ class ConversationService:
         self.state_manager = state_manager
         self.tool_registry = ToolRegister(audio_controller, state_manager)
 
-        self.recording_service = RecordingService()
-        self.transcription_service = TranscriptionService()
-        self.tts_service = TextToSpeechService(
-            model_path="models/en_US-hfc_male-medium.onnx",
-            config_path="models/en_US-hfc_male-medium.onnx.json",
+        self.audio_service = AudioService(
+            tts_model_path=get_resource_path("models/en_US-hfc_male-medium.onnx"),
+            tts_config_path=get_resource_path("models/en_US-hfc_male-medium.onnx.json"),
         )
         self.gemini_service = GeminiService(
             state_manager=self.state_manager, tools=self.tool_registry.get_tools()
@@ -73,10 +67,10 @@ class ConversationService:
                 if not self.running:
                     break
 
-                audio_bytes = self.recording_service.record_with_threshold()
+                audio_bytes = self.audio_service.record_with_threshold()
 
                 if audio_bytes:
-                    user_text = self.transcription_service.transcribe_audio(audio_bytes)
+                    user_text = self.audio_service.transcribe_audio(audio_bytes)
 
                     if user_text.strip():
                         print(f"User: {user_text}")
@@ -110,13 +104,15 @@ class ConversationService:
                 elif hasattr(part, "function_call") and part.function_call:
                     tool_calls.append(part.function_call)
 
-        self.recording_service.set_kai_is_speaking(True)
+        self.audio_service.set_kai_is_speaking(True)
         self.turn_complete_event.clear()
 
         if response_text and tool_calls:
             self._execute_tools_during_speech(response_text, tool_calls)
         elif response_text:
-            self.tts_service.text_to_speech(response_text, callback=self._complete_turn)
+            self.audio_service.text_to_speech(
+                response_text, callback=self._complete_turn
+            )
         elif tool_calls:
             self._execute_tools_and_follow_up(tool_calls)
         else:
@@ -139,7 +135,7 @@ class ConversationService:
                 print(f"Tool executed during speech: {tool_call.name} -> {result}")
 
         threading.Thread(target=execute_tools_immediately, daemon=True).start()
-        self.tts_service.text_to_speech(response_text, callback=self._complete_turn)
+        self.audio_service.text_to_speech(response_text, callback=self._complete_turn)
 
     def _execute_tools_and_follow_up(
         self, tool_calls: List[types.FunctionCall]
@@ -196,7 +192,7 @@ class ConversationService:
 
         def delayed_turn_completion():
             threading.Event().wait(1.5)
-            self.recording_service.set_kai_is_speaking(False)
+            self.audio_service.set_kai_is_speaking(False)
             self.audio_controller.restore_background_after_tts()
             self.turn_complete_event.set()
             print("Turn completed - ready for user input")

@@ -1,7 +1,29 @@
 import datetime
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any, Dict
+
+
+def get_resource_path(relative_path: str) -> str:
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(getattr(sys, "_MEIPASS"), relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+
+def get_app_data_dir() -> Path:
+    if sys.platform == "darwin":
+        app_support = Path.home() / "Library" / "Application Support" / "Tessera"
+    elif sys.platform == "win32":
+        app_support = Path.home() / "AppData" / "Local" / "Tessera"
+    else:
+        app_support = Path.home() / ".tessera"
+
+    if not app_support.exists():
+        app_support.mkdir(parents=True, exist_ok=True)
+
+    return app_support
 
 
 class StateManager:
@@ -9,9 +31,8 @@ class StateManager:
     Manages the state of the application, including progress and session data.
     """
 
-    def __init__(self, progress_file: str = "src/prompts/progress.json") -> None:
-        repo_root = Path(__file__).resolve().parents[2]
-        self.progress_file = (repo_root / progress_file).resolve()
+    def __init__(self, progress_file: str = "progress.json") -> None:
+        self.progress_file = get_app_data_dir() / progress_file
 
     def _read_state(self) -> Dict[str, Any]:
         """Reads state from progress file, initializing if empty.

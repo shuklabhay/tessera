@@ -1,20 +1,32 @@
 import os
 import random
+import sys
 from threading import Lock, Thread
 from typing import List, Optional, Tuple
 
 import numpy as np
 import soundfile as sf
 
-PROJECT_ROOT = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
+
+def get_resource_path(relative_path: str) -> str:
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(getattr(sys, "_MEIPASS"), relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+
+def get_project_root() -> str:
+    if hasattr(sys, "_MEIPASS"):
+        return getattr(sys, "_MEIPASS")
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+PROJECT_ROOT = get_project_root()
 
 AUDIO_DIRS = {
-    "environmental": os.path.join(PROJECT_ROOT, "audio", "environmental"),
-    "noise": os.path.join(PROJECT_ROOT, "audio", "noise"),
-    "speakers": os.path.join(PROJECT_ROOT, "audio", "speakers"),
-    "alerts": os.path.join(PROJECT_ROOT, "audio", "alerts"),
+    "environmental": get_resource_path(os.path.join("audio", "environmental")),
+    "noise": get_resource_path(os.path.join("audio", "noise")),
+    "speakers": get_resource_path(os.path.join("audio", "speakers")),
+    "alerts": get_resource_path(os.path.join("audio", "alerts")),
 }
 
 

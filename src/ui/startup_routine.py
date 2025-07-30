@@ -1,14 +1,59 @@
 import os
+import webbrowser
+from pathlib import Path
 from typing import Any, Callable
 
 from kivy.animation import Animation
-from kivy.graphics import Color, Rectangle
+from kivy.graphics import Color, Rectangle, Line
 from kivy.properties import NumericProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
+
+
+def is_valid_api_key(api_key: str) -> bool:
+    """Validates if API key is legitimate and not a placeholder."""
+    if not api_key:
+        return False
+
+    key = api_key.strip()
+
+    if not key.startswith("AIza"):
+        return False
+
+    if len(key) < 20:
+        return False
+
+    placeholder_values = {"test_key", "your_api_key", "api_key_here"}
+    if key.lower() in placeholder_values:
+        return False
+
+    return True
+
+
+def save_api_key_safely(api_key: str) -> bool:
+    """Saves API key with atomic write to prevent corruption."""
+    from managers.state_manager import get_app_data_dir
+
+    app_data_dir = get_app_data_dir()
+    env_path = app_data_dir / ".env"
+    temp_path = app_data_dir / ".env.tmp"
+
+    with open(temp_path, "w") as f:
+        f.write(f"GEMINI_API_KEY={api_key}\n")
+        f.flush()
+        os.fsync(f.fileno())
+
+    temp_path.rename(env_path)
+
+    with open(env_path) as f:
+        content = f.read().strip()
+        if f"GEMINI_API_KEY={api_key}" in content:
+            return True
+
+    return False
 
 
 class StartupRoutine(FloatLayout):
@@ -19,7 +64,7 @@ class StartupRoutine(FloatLayout):
     def __init__(self, on_complete: Callable[[], None], **kwargs) -> None:
         super(StartupRoutine, self).__init__(**kwargs)
         self.on_complete = on_complete
-        
+
         with self.canvas.before:
             self.splash_color = Color(0, 0, 0, 1)
             self.splash_bg = Rectangle(pos=self.pos, size=self.size)
@@ -37,9 +82,9 @@ class StartupRoutine(FloatLayout):
             self._show_medical_disclaimer()
 
     def _needs_api_key(self) -> bool:
-        """Checks if API key setup is needed."""
+        """Checks if API key setup is needed with robust validation."""
         api_key = os.environ.get("GEMINI_API_KEY")
-        return not api_key or not api_key.strip().startswith("AIza")
+        return not is_valid_api_key(api_key)
 
     def _show_api_key_setup(self) -> None:
         """Shows the API key setup interface."""
@@ -97,7 +142,12 @@ class StartupRoutine(FloatLayout):
             size_hint_y=None,
             height=50,
             multiline=False,
+            cursor_color=(0.2, 0.5, 1, 1),
+            selection_color=(0.2, 0.5, 1, 0.3),
+            background_color=(0.15, 0.15, 0.15, 1),
+            foreground_color=(1, 1, 1, 1),
         )
+        self.api_input.bind(focus=self._on_input_focus)
 
         self.continue_btn = Button(
             text="CONTINUE",
@@ -171,12 +221,23 @@ class StartupRoutine(FloatLayout):
 
         self.add_widget(main_layout)
 
+    def _on_input_focus(self, instance: Any, focused: bool) -> None:
+        """Handles focus changes for the API input to add/remove outline."""
+        with instance.canvas.after:
+            instance.canvas.after.clear()
+            if focused:
+                Color(0.2, 0.5, 1, 1)
+                Line(
+                    rectangle=(instance.x, instance.y, instance.width, instance.height),
+                    width=2,
+                )
+
     def _on_text_change(self, instance: Any, text: str) -> None:
         """Handles text changes in the API key input."""
         self.status.text = ""
-        is_valid = len(text.strip()) > 20 and text.strip().startswith("AIza")
+        is_valid = is_valid_api_key(text)
         self.continue_btn.disabled = not is_valid
-        
+
         if is_valid:
             self.continue_btn.background_color = (0.2, 0.7, 0.2, 1)
         else:
@@ -185,29 +246,23 @@ class StartupRoutine(FloatLayout):
     def _on_continue(self, instance: Any) -> None:
         """Handles the continue button press."""
         api_key = self.api_input.text.strip()
-        
-        if not api_key or not api_key.startswith("AIza"):
+
+        if not is_valid_api_key(api_key):
             self.status.text = "Invalid API key"
             return
 
-        try:
-            env_path = os.path.join(os.getcwd(), ".env")
-            with open(env_path, "w") as f:
-                f.write(f"GEMINI_API_KEY={api_key}\n")
-            
-            os.environ["GEMINI_API_KEY"] = api_key
-            
-            from dotenv import load_dotenv
-            load_dotenv()
-            
-            self.status.color = (0.3, 1, 0.3, 1)
-            self.status.text = "Saved! Starting app..."
-            
-            from kivy.clock import Clock
-            Clock.schedule_once(lambda dt: self._show_medical_disclaimer(), 1.0)
-            
-        except Exception as e:
-            self.status.text = f"Error: {str(e)}"
+        if not save_api_key_safely(api_key):
+            self.status.text = "Error saving API key"
+            return
+
+        os.environ["GEMINI_API_KEY"] = api_key
+
+        self.status.color = (0.3, 1, 0.3, 1)
+        self.status.text = "Saved! Starting app..."
+
+        from kivy.clock import Clock
+
+        Clock.schedule_once(lambda dt: self._show_medical_disclaimer(), 1.0)
 
     def _on_proceed(self, instance: Any) -> None:
         """Handles the proceed button press."""
@@ -217,7 +272,6 @@ class StartupRoutine(FloatLayout):
 
     def _open_link(self, instance: Any) -> None:
         """Opens the API key link in the default browser."""
-        import webbrowser
         webbrowser.open("https://aistudio.google.com/app/apikey")
 
     def _update_bg(self, instance: Any, value: Any) -> None:
