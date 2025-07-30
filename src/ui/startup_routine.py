@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from kivy.animation import Animation
-from kivy.graphics import Color, Rectangle, Line
+from kivy.graphics import Color, Line, Rectangle
 from kivy.properties import NumericProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -12,9 +12,18 @@ from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 
+from managers.state_manager import get_app_data_dir
+
 
 def is_valid_api_key(api_key: str) -> bool:
-    """Validates if API key is legitimate and not a placeholder."""
+    """Validates if API key is legitimate and not a placeholder.
+
+    Args:
+        api_key: The API key string to validate
+
+    Returns:
+        True if the API key appears valid, False otherwise
+    """
     if not api_key:
         return False
 
@@ -34,9 +43,14 @@ def is_valid_api_key(api_key: str) -> bool:
 
 
 def save_api_key_safely(api_key: str) -> bool:
-    """Saves API key with atomic write to prevent corruption."""
-    from managers.state_manager import get_app_data_dir
+    """Saves API key with atomic write to prevent corruption.
 
+    Args:
+        api_key: The API key string to save
+
+    Returns:
+        True if the API key was saved successfully, False otherwise
+    """
     app_data_dir = get_app_data_dir()
     env_path = app_data_dir / ".env"
     temp_path = app_data_dir / ".env.tmp"
@@ -62,6 +76,12 @@ class StartupRoutine(FloatLayout):
     splash_opacity = NumericProperty(1.0)
 
     def __init__(self, on_complete: Callable[[], None], **kwargs) -> None:
+        """Initialize the startup routine.
+
+        Args:
+            on_complete: Callback function to call when startup is complete
+            **kwargs: Additional keyword arguments for FloatLayout
+        """
         super(StartupRoutine, self).__init__(**kwargs)
         self.on_complete = on_complete
 
@@ -82,7 +102,11 @@ class StartupRoutine(FloatLayout):
             self._show_medical_disclaimer()
 
     def _needs_api_key(self) -> bool:
-        """Checks if API key setup is needed with robust validation."""
+        """Checks if API key setup is needed with robust validation.
+
+        Returns:
+            True if API key setup is needed, False otherwise
+        """
         api_key = os.environ.get("GEMINI_API_KEY")
         return not is_valid_api_key(api_key)
 
@@ -222,7 +246,12 @@ class StartupRoutine(FloatLayout):
         self.add_widget(main_layout)
 
     def _on_input_focus(self, instance: Any, focused: bool) -> None:
-        """Handles focus changes for the API input to add/remove outline."""
+        """Handles focus changes for the API input to add/remove outline.
+
+        Args:
+            instance: The TextInput widget instance
+            focused: Whether the input is focused
+        """
         with instance.canvas.after:
             instance.canvas.after.clear()
             if focused:
@@ -233,7 +262,12 @@ class StartupRoutine(FloatLayout):
                 )
 
     def _on_text_change(self, instance: Any, text: str) -> None:
-        """Handles text changes in the API key input."""
+        """Handles text changes in the API key input.
+
+        Args:
+            instance: The TextInput widget instance
+            text: The current text in the input
+        """
         self.status.text = ""
         is_valid = is_valid_api_key(text)
         self.continue_btn.disabled = not is_valid
@@ -244,7 +278,11 @@ class StartupRoutine(FloatLayout):
             self.continue_btn.background_color = (0.3, 0.3, 0.3, 1)
 
     def _on_continue(self, instance: Any) -> None:
-        """Handles the continue button press."""
+        """Handles the continue button press.
+
+        Args:
+            instance: The Button widget instance
+        """
         api_key = self.api_input.text.strip()
 
         if not is_valid_api_key(api_key):
@@ -265,22 +303,39 @@ class StartupRoutine(FloatLayout):
         Clock.schedule_once(lambda dt: self._show_medical_disclaimer(), 1.0)
 
     def _on_proceed(self, instance: Any) -> None:
-        """Handles the proceed button press."""
+        """Handles the proceed button press.
+
+        Args:
+            instance: The Button widget instance
+        """
         anim = Animation(splash_opacity=0.0, duration=0.5)
         anim.bind(on_complete=lambda *args: self.on_complete())
         anim.start(self)
 
     def _open_link(self, instance: Any) -> None:
-        """Opens the API key link in the default browser."""
+        """Opens the API key link in the default browser.
+
+        Args:
+            instance: The Button widget instance
+        """
         webbrowser.open("https://aistudio.google.com/app/apikey")
 
     def _update_bg(self, instance: Any, value: Any) -> None:
-        """Updates the background when the window is resized."""
+        """Updates the background when the window is resized.
+
+        Args:
+            instance: The widget instance
+            value: The new value (position or size)
+        """
         self.splash_bg.pos = instance.pos
         self.splash_bg.size = instance.size
 
     def _update_splash_color(self, *args: Any) -> None:
-        """Updates the splash background color's opacity."""
+        """Updates the splash background color's opacity.
+
+        Args:
+            *args: Variable arguments from the property binding
+        """
         self.splash_color.a = self.splash_opacity
         self.opacity = self.splash_opacity
         self.disabled = self.splash_opacity == 0.0

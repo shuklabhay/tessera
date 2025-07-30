@@ -19,7 +19,6 @@ def build_executable() -> bool:
         "PyInstaller",
         "--clean",
         "--noconfirm",
-        "--windowed",
         str(spec_path),
     ]
 
