@@ -3,6 +3,8 @@
 [![Pages Deploy](https://github.com/shuklabhay/tessera/actions/workflows/deploy.yml/badge.svg)](https://github.com/shuklabhay/tessera/actions/workflows/deploy.yml)
 [![Lint](https://github.com/shuklabhay/tessera/actions/workflows/lint_py.yml/badge.svg)](https://github.com/shuklabhay/tessera/actions/workflows/lint_py.yml)
 
+![banner](https://github.com/shuklabhay/tessera/blob/main/web/assets/banner.jpg?raw=true)
+
 ## App Info
 
 Conversational voice agent for auditory rehabilitation through adaptive listening exercises. View more information [here.](https://shuklabhay.github.io/tessera/)
@@ -18,10 +20,15 @@ Conversational voice agent for auditory rehabilitation through adaptive listenin
 
 ## Setup
 
-- [Install](https://www.python.org/downloads/) Python 3.8 or higher
+- [Install](https://www.python.org/downloads/) Python 3.12.3 or higher
   - Confirm installation by running `python --version` in the command line
 - [Install](https://github.com/kivy/kivy#installation) Kivy dependencies for your platform
 - Install required packages by running `pip install -r requirements.txt`
+
+## Build app
+
+- Install required packages by running `pip install -r requirements.txt`
+- From the root directory run `pyinstaller Tessera.spec`
 
 ### API Key Setup
 

@@ -182,6 +182,7 @@ AGENTS.md
 src/prompts/progress.json
 /audio
 /models
+!Tessera.spec
 
 # Web assets
 /web/media/videos/*.mp4
